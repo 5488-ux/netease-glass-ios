@@ -23,7 +23,7 @@ final class AppModel: ObservableObject {
         loginManager = LoginManager(api: api)
         audioPlayer = AudioPlayerManager(api: api)
         downloadManager = DownloadManager(api: api)
+        audioPlayer.errorHandler = { [weak self] message in self?.alertMessage = message }
         downloadManager.errorHandler = { [weak self] message in self?.alertMessage = message }
     }
 }
-

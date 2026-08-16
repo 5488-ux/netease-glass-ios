@@ -6,6 +6,7 @@ import Foundation
 final class AudioPlayerManager: NSObject, ObservableObject {
     @Published private(set) var playingSongID: Int?
     @Published private(set) var isPlaying = false
+    var errorHandler: ((String) -> Void)?
     private let api: NeteaseAPI
     private let player = AVPlayer()
 
@@ -34,6 +35,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
             player.play()
         } catch {
             isPlaying = false
+            errorHandler?(NeteaseAPIError.userMessage(for: error))
         }
     }
 

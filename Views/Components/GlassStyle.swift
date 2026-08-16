@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum AppPalette {
     static let blue = Color(red: 0.12, green: 0.48, blue: 0.96)
@@ -72,22 +73,37 @@ struct AppSectionHeader: View {
 struct RemoteImage: View {
     let url: URL?
     var size: CGFloat
+    @State private var image: UIImage?
+
     var body: some View {
-        AsyncImage(url: url) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFill()
+        ZStack {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
             } else {
-                ZStack {
-                    AppPalette.blue.opacity(0.15)
-                    Image(systemName: "music.note")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(AppPalette.blue)
-                }
+                AppPalette.blue.opacity(0.15)
+                Image(systemName: "music.note")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppPalette.blue)
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityHidden(true)
+        .task(id: url) { await loadImage() }
+    }
+
+    private func loadImage() async {
+        image = nil
+        guard let url else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 20
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              let loaded = UIImage(data: data) else { return }
+        image = loaded
     }
 }
 

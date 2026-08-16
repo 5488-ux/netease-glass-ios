@@ -16,7 +16,7 @@
 
 使用 Xcode 26 或更新版本打开 `NeteaseGlass.xcodeproj`，运行目标选择 iOS 26 模拟器或真机。
 
-本项目直接调用网易云公开接口。接口可能受网易云风控、地区、版权和登录状态影响；下载按钮只在歌曲下载接口实际返回可用 URL 时开始任务。
+本项目按网易云请求协议调用搜索、歌单、账号和播放地址接口。接口仍可能受网易云风控、地区、版权和登录状态影响；下载按钮只在歌曲下载接口实际返回可用 URL 时开始任务。
 
 ## 构建未签名 IPA
 
@@ -24,5 +24,5 @@ Actions 工作流位于 `.github/workflows/build.yml`。它使用 macOS Runner�
 
 ## 版本
 
-- Marketing Version: `1.7`
-- Build Number: `8`
+- Marketing Version: `1.8`
+- Build Number: `9`

@@ -26,18 +26,20 @@ struct SongCard: View {
                 app.audioPlayer.toggle(song: song)
             } label: {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .frame(width: 34, height: 34)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .foregroundStyle(AppPalette.blue)
             .accessibilityLabel(isPlaying ? "暂停试听" : "播放试听")
             Button {
                 app.downloadManager.enqueue(song: song)
             } label: {
                 Image(systemName: "arrow.down.circle")
-                    .frame(width: 34, height: 34)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .foregroundStyle(AppPalette.orange)
             .accessibilityLabel("下载")
         }

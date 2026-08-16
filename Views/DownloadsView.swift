@@ -109,10 +109,24 @@ private struct DownloadTaskCard: View {
                 Spacer()
                 if task.state == .downloading {
                     Button { app.downloadManager.pause(task) } label: { Label("暂停", systemImage: "pause.fill") }
-                } else if task.state == .paused || task.state == .failed {
-                    Button { app.downloadManager.resume(task) } label: { Label(task.state == .failed ? "重试" : "继续", systemImage: task.state == .failed ? "arrow.clockwise" : "play.fill") }
+                        .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                } else if task.state == .paused {
+                    Button { app.downloadManager.resume(task) } label: { Label("继续", systemImage: "play.fill") }
+                        .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                } else if task.state == .failed {
+                    Button { app.downloadManager.retry(task) } label: { Label("重试", systemImage: "arrow.clockwise") }
+                        .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 Button(role: .destructive) { app.downloadManager.delete(task) } label: { Image(systemName: "trash") }
+                    .buttonStyle(.plain)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("删除任务")
             }
             .font(.caption.weight(.medium))
