@@ -46,6 +46,7 @@ final class NeteaseAPI {
     func updateCookie(_ cookie: String) { self.cookie = cookie }
 
     func searchSongs(_ keyword: String) async throws -> [Song] {
+        try requireLogin()
         let json = try await get(path: "/api/search/get/web", query: [
             URLQueryItem(name: "s", value: keyword),
             URLQueryItem(name: "type", value: "1"),
@@ -58,6 +59,7 @@ final class NeteaseAPI {
     }
 
     func searchUsers(_ keyword: String) async throws -> [NeteaseUser] {
+        try requireLogin()
         let json = try await get(path: "/api/search/get/web", query: [
             URLQueryItem(name: "s", value: keyword),
             URLQueryItem(name: "type", value: "1002"),
@@ -70,6 +72,7 @@ final class NeteaseAPI {
     }
 
     func playlist(id: Int) async throws -> Playlist {
+        try requireLogin()
         let json = try await get(path: "/api/playlist/detail", query: [URLQueryItem(name: "id", value: String(id)), URLQueryItem(name: "s", value: "0")])
         guard let payload = json["playlist"] as? [String: Any], let playlist = parsePlaylist(payload) else {
             throw NeteaseAPIError.message("歌单不存在或网易云拒绝了请求")
@@ -86,6 +89,7 @@ final class NeteaseAPI {
     }
 
     func userPlaylists(userID: Int) async throws -> [Playlist] {
+        try requireLogin()
         let json = try await get(path: "/api/user/playlist", query: [
             URLQueryItem(name: "uid", value: String(userID)),
             URLQueryItem(name: "limit", value: "100"),
@@ -160,6 +164,7 @@ final class NeteaseAPI {
     }
 
     func resolveDownload(for song: Song) async throws -> DownloadPermission {
+        try requireLogin()
         let id = "[\(song.id)]".urlEncoded
         let url = downloadBaseURL.appending(path: "/api/song/enhance/player/url/v1")
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
@@ -213,6 +218,10 @@ final class NeteaseAPI {
         components.queryItems = query
         guard let url = components.url else { throw NeteaseAPIError.invalidURL }
         return try await getRaw(url: url, method: "GET", body: nil)
+    }
+
+    private func requireLogin() throws {
+        guard hasCookie else { throw NeteaseAPIError.message("请先登录网易云音乐") }
     }
 
     private func getRaw(url: URL, method: String, body: Data?) async throws -> [String: Any] {

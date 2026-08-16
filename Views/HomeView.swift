@@ -17,34 +17,24 @@ struct HomeView: View {
     @State private var selectedUser: NeteaseUser?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showingLogin = false
+    @State private var loginRequired = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 AppPageBackground()
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("发现")
-                                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                                Text("搜索、试听并保存你有权限下载的音乐")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "waveform")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 42, height: 42)
-                                .appGlass(cornerRadius: 14)
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        header
+                        if !app.loginManager.isLoggedIn {
+                            loginCard
                         }
-                        modeSelector
-                        searchField
+                        searchSection
                         content
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.top, 8)
                     .padding(.bottom, 30)
                 }
                 .scrollIndicators(.hidden)
@@ -53,10 +43,90 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $selectedPlaylist) { PlaylistDetailView(playlist: $0) }
             .sheet(item: $selectedUser) { UserDetailView(user: $0) }
+            .sheet(isPresented: $showingLogin) { QRLoginView() }
+            .alert("需要登录", isPresented: $loginRequired) {
+                Button("去登录") { showingLogin = true }
+                Button("取消", role: .cancel) { }
+            } message: {
+                Text("登录网易云音乐后才能搜索歌曲、歌单和用户。")
+            }
             .alert("请求失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("知道了", role: .cancel) { errorMessage = nil }
             } message: { Text(errorMessage ?? "") }
         }
+    }
+
+    private var header: some View {
+        HStack(spacing: 13) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(width: 58, height: 58)
+                Image(systemName: "waveform")
+                    .font(.system(size: 25, weight: .bold))
+                    .foregroundStyle(.primary)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("发现音乐")
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                Text("搜索、试听并保存有权限下载的音乐")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Button { showingLogin = true } label: {
+                Image(systemName: app.loginManager.isLoggedIn ? "person.crop.circle.fill" : "person.crop.circle.badge.plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .appGlass(cornerRadius: 15)
+            .accessibilityLabel(app.loginManager.isLoggedIn ? "账号" : "登录")
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var loginCard: some View {
+        Button { showingLogin = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "qrcode")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 40, height: 40)
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("登录网易云音乐")
+                        .font(.subheadline.weight(.semibold))
+                    Text("扫码后才能搜索和检查歌曲下载权限")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+        }
+        .buttonStyle(.plain)
+        .appGlass(cornerRadius: 20)
+    }
+
+    private var searchSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            AppSectionHeader(
+                title: "搜索",
+                subtitle: app.loginManager.isLoggedIn ? "选择类型后输入关键词" : "登录后解锁网易云搜索"
+            )
+            modeSelector
+            searchField
+        }
+        .appGlass(cornerRadius: 24)
     }
 
     private var modeSelector: some View {
@@ -77,7 +147,7 @@ struct HomeView: View {
             }
         }
         .padding(4)
-        .appGlass(cornerRadius: 18)
+        .background(Color.primary.opacity(0.045), in: Capsule())
     }
 
     private var searchField: some View {
@@ -103,44 +173,60 @@ struct HomeView: View {
                 .font(.body.weight(.semibold))
                 .frame(width: 36, height: 36)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .background(Color.primary.opacity(0.09), in: Circle())
             .accessibilityLabel("搜索")
         }
-        .padding(11)
-        .appGlass(cornerRadius: 20)
+        .padding(10)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        }
     }
 
     @ViewBuilder private var content: some View {
         if isLoading && songs.isEmpty && users.isEmpty {
             ProgressView("正在搜索…").frame(maxWidth: .infinity).padding(.top, 30)
         } else if mode == .song {
-            if songs.isEmpty { emptyState("输入关键词开始搜索", icon: "music.note.list") }
+            if songs.isEmpty { emptyState("输入关键词开始搜索", detail: "登录后搜索歌曲并试听", icon: "music.note.list") }
             else { LazyVStack(spacing: 10) { ForEach(songs) { SongCard(song: $0) } } }
         } else if mode == .user {
-            if users.isEmpty { emptyState("输入用户名搜索用户", icon: "person.2") }
+            if users.isEmpty { emptyState("输入用户名搜索用户", detail: "查找用户公开歌单", icon: "person.2") }
             else { LazyVStack(spacing: 10) { ForEach(users) { user in Button { selectedUser = user } label: { UserCard(user: user) }.buttonStyle(.plain) } } }
         } else {
-            emptyState("粘贴链接后进入歌单详情", icon: "rectangle.stack")
+            emptyState("粘贴链接后进入歌单详情", detail: "支持网易云音乐歌单链接", icon: "rectangle.stack")
         }
     }
 
-    private func emptyState(_ title: String, icon: String) -> some View {
+    private func emptyState(_ title: String, detail: String, icon: String) -> some View {
         VStack(spacing: 9) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(.secondary)
+            ZStack {
+                Circle()
+                    .fill(Color.primary.opacity(0.07))
+                    .frame(width: 66, height: 66)
+                Image(systemName: icon)
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
             Text(title)
-                .font(.subheadline)
+                .font(.subheadline.weight(.semibold))
+            Text(detail)
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 45)
-        .appGlass(cornerRadius: 22)
+        .padding(.vertical, 28)
     }
 
     private func search() {
         let value = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
+        guard app.loginManager.isLoggedIn else {
+            loginRequired = true
+            return
+        }
         isLoading = true
         errorMessage = nil
         Task {

@@ -7,47 +7,79 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Text("设置").font(.largeTitle.bold())
-                    if let account = app.loginManager.account {
-                        accountHeader(account.user)
-                        Text("我的歌单").font(.headline)
-                        LazyVStack(spacing: 10) {
-                            ForEach(account.user.playlists) { playlist in
-                                Button { selectedPlaylist = playlist } label: { PlaylistCard(playlist: playlist) }.buttonStyle(.plain)
+            ZStack {
+                AppPageBackground()
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 13) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                    .fill(Color.primary.opacity(0.08))
+                                    .frame(width: 58, height: 58)
+                                Image(systemName: "person.crop.circle.fill")
+                                    .font(.system(size: 25, weight: .bold))
                             }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("设置")
+                                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                                Text("账号、歌单和本地保存位置")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
                         }
-                        Button("退出登录", role: .destructive) { app.loginManager.logout() }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 4)
-                    } else {
-                        VStack(alignment: .leading, spacing: 14) {
-                            Image(systemName: "person.crop.circle.badge.plus").font(.largeTitle).foregroundStyle(.secondary)
-                            Text("登录网易云音乐").font(.title3.bold())
-                            Text("扫码后可读取个人歌单，并由网易云接口判断每首歌曲的实际下载权限。")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Button { showingLogin = true } label: { Label("二维码登录", systemImage: "qrcode") }
+                        .padding(.vertical, 8)
+
+                        if let account = app.loginManager.account {
+                            accountHeader(account.user)
+                            AppSectionHeader(title: "我的歌单", subtitle: "创建和收藏的网易云歌单", count: "\(account.user.playlists.count)")
+                            LazyVStack(spacing: 10) {
+                                ForEach(account.user.playlists) { playlist in
+                                    Button { selectedPlaylist = playlist } label: { PlaylistCard(playlist: playlist) }.buttonStyle(.plain)
+                                }
+                            }
+                            Button("退出登录", role: .destructive) { app.loginManager.logout() }
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 4)
+                        } else {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                    .font(.system(size: 32, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Text("登录网易云音乐")
+                                    .font(.title3.bold())
+                                Text("扫码后可读取个人歌单，并由网易云接口判断每首歌曲的实际下载权限。")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Button { showingLogin = true } label: {
+                                    Label("二维码登录", systemImage: "qrcode")
+                                        .frame(maxWidth: .infinity)
+                                }
                                 .buttonStyle(.borderedProminent)
+                            }
+                            .padding(18)
+                            .appGlass(cornerRadius: 22)
                         }
-                        .padding(18)
-                        .appGlass(cornerRadius: 22)
+
+                        AppSectionHeader(title: "关于", subtitle: "应用信息与文件保存说明")
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("NeteaseGlass", systemImage: "waveform")
+                            Text("iOS 26 · SwiftUI · Liquid Glass")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("下载文件保存在 App 沙盒 Documents/Music/，不会上传到第三方服务器。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(15)
+                        .appGlass(cornerRadius: 18)
                     }
-                    Text("关于")
-                        .font(.headline)
-                        .padding(.top, 4)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("NeteaseGlass", systemImage: "waveform")
-                        Text("iOS 26 · SwiftUI · Liquid Glass")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text("下载文件保存在 App 沙盒 Documents/Music/，不会上传到第三方服务器。")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .padding(15)
-                    .appGlass(cornerRadius: 18)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 30)
                 }
-                .padding(16)
-                .padding(.bottom, 30)
             }
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingLogin) { QRLoginView() }

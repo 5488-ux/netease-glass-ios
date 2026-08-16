@@ -5,29 +5,76 @@ struct DownloadsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("下载").font(.largeTitle.bold())
-                        Spacer()
-                        Text("\(app.downloadManager.tasks.count) 个任务").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if app.downloadManager.tasks.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "arrow.down.circle").font(.largeTitle).foregroundStyle(.secondary)
-                            Text("还没有下载任务").font(.subheadline).foregroundStyle(.secondary)
+            ZStack {
+                AppPageBackground()
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 13) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                    .fill(Color.primary.opacity(0.08))
+                                    .frame(width: 58, height: 58)
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 25, weight: .bold))
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("下载")
+                                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                                Text("查看进度，管理已经保存的音乐")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer(minLength: 8)
+                            Text("\(app.downloadManager.tasks.count)")
+                                .font(.caption.bold().monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color.primary.opacity(0.07), in: Capsule())
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 120)
-                    } else {
-                        LazyVStack(spacing: 10) { ForEach(app.downloadManager.tasks) { task in DownloadTaskCard(task: task) } }
+                        .padding(.vertical, 8)
+
+                        if app.downloadManager.tasks.isEmpty {
+                            emptyState
+                        } else {
+                            AppSectionHeader(title: "下载任务", subtitle: "完成后仍会保留记录", count: "\(app.downloadManager.tasks.count)")
+                            LazyVStack(spacing: 10) {
+                                ForEach(app.downloadManager.tasks) { task in DownloadTaskCard(task: task) }
+                            }
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 30)
                 }
-                .padding(16)
-                .padding(.bottom, 30)
             }
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(Color.primary.opacity(0.07))
+                    .frame(width: 72, height: 72)
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 29, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            Text("还没有下载任务")
+                .font(.headline)
+            Text("从主页搜索歌曲后，下载任务会出现在这里")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 42)
+        .appGlass(cornerRadius: 24)
     }
 }
 
@@ -77,4 +124,3 @@ private struct DownloadTaskCard: View {
         switch state { case .completed: return .green; case .failed: return .red; case .paused: return .orange; default: return .primary }
     }
 }
-

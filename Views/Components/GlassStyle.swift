@@ -18,6 +18,35 @@ struct AppPageBackground: View {
     }
 }
 
+struct AppSectionHeader: View {
+    let title: String
+    let subtitle: String
+    var count: String?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.title3.weight(.bold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            if let count {
+                Text(count)
+                    .font(.caption.bold().monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.primary.opacity(0.07), in: Capsule())
+            }
+        }
+    }
+}
+
 struct RemoteImage: View {
     let url: URL?
     var size: CGFloat
