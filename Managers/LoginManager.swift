@@ -31,13 +31,35 @@ final class LoginManager: ObservableObject {
         }
     }
 
-    func finishLogin(with cookie: String) async {
-        guard !cookie.isEmpty else { errorMessage = "登录成功但没有拿到 Cookie"; return }
+    @discardableResult
+    func finishLogin(with cookie: String) async -> Bool {
+        guard !cookie.isEmpty else {
+            errorMessage = "登录成功但没有拿到 Cookie"
+            return false
+        }
+
         do {
             try KeychainStore.saveCookie(cookie)
             api.updateCookie(cookie)
-            await refreshAccount()
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+
+        for attempt in 0..<4 {
+            do {
+                account = try await api.account()
+                errorMessage = nil
+                return true
+            } catch {
+                if attempt < 3 {
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
+        }
+
+        errorMessage = "扫码已成功，账号资料暂时加载失败；保持网络后回到设置页会自动重试"
+        return false
     }
 
     func logout() {

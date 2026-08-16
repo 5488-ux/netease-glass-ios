@@ -13,10 +13,11 @@ struct DownloadsView: View {
                         HStack(spacing: 13) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                                    .fill(Color.primary.opacity(0.08))
+                                    .fill(AppPalette.orange.opacity(0.13))
                                     .frame(width: 58, height: 58)
                                 Image(systemName: "arrow.down.circle.fill")
                                     .font(.system(size: 25, weight: .bold))
+                                    .foregroundStyle(AppPalette.orange)
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
@@ -63,7 +64,7 @@ struct DownloadsView: View {
                     .frame(width: 72, height: 72)
                 Image(systemName: "arrow.down.circle")
                     .font(.system(size: 29, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppPalette.orange)
             }
             Text("还没有下载任务")
                 .font(.headline)

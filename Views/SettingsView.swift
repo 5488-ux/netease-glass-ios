@@ -15,10 +15,11 @@ struct SettingsView: View {
                         HStack(spacing: 13) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                                    .fill(Color.primary.opacity(0.08))
+                                    .fill(AppPalette.violet.opacity(0.13))
                                     .frame(width: 58, height: 58)
                                 Image(systemName: "person.crop.circle.fill")
                                     .font(.system(size: 25, weight: .bold))
+                                    .foregroundStyle(AppPalette.violet)
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
@@ -58,6 +59,7 @@ struct SettingsView: View {
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.borderedProminent)
+                                .tint(AppPalette.violet)
                             }
                             .padding(18)
                             .appGlass(cornerRadius: 22)

@@ -156,7 +156,7 @@ final class NeteaseAPI {
         case 803:
             let responseCookie = (json["cookie"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let setCookie = Self.cookieHeader(from: http)
-            let merged = responseCookie.isEmpty ? setCookie : responseCookie
+            let merged = Self.mergeCookieHeaders(setCookie, responseCookie)
             if !merged.isEmpty { cookie = merged }
             return .success
         default: return .failed
@@ -280,6 +280,29 @@ final class NeteaseAPI {
             result[key] = value
         }, for: response.url ?? URL(string: "https://music.163.com")!)
         return cookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+    }
+
+    private static func mergeCookieHeaders(_ headers: String...) -> String {
+        let ignoredAttributes: Set<String> = [
+            "path", "domain", "expires", "max-age", "secure", "httponly", "samesite", "priority"
+        ]
+        var values: [String: String] = [:]
+
+        for header in headers {
+            for part in header.split(separator: ";") {
+                let item = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let separator = item.firstIndex(of: "=") else { continue }
+                let name = item[..<separator].trimmingCharacters(in: .whitespacesAndNewlines)
+                let value = item[item.index(after: separator)...].trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty, !value.isEmpty, !ignoredAttributes.contains(name.lowercased()) else { continue }
+                values[String(name)] = String(value)
+            }
+        }
+
+        return values.keys.sorted().compactMap { key in
+            guard let value = values[key] else { return nil }
+            return "\(key)=\(value)"
+        }.joined(separator: "; ")
     }
 }
 

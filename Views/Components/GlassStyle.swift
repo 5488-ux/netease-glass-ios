@@ -1,5 +1,12 @@
 import SwiftUI
 
+enum AppPalette {
+    static let blue = Color(red: 0.12, green: 0.48, blue: 0.96)
+    static let cyan = Color(red: 0.05, green: 0.70, blue: 0.82)
+    static let violet = Color(red: 0.47, green: 0.32, blue: 0.90)
+    static let orange = Color(red: 0.96, green: 0.47, blue: 0.20)
+}
+
 extension View {
     @ViewBuilder
     func appGlass(cornerRadius: CGFloat = 20) -> some View {
@@ -13,8 +20,22 @@ extension View {
 
 struct AppPageBackground: View {
     var body: some View {
-        Color(uiColor: .systemGroupedBackground)
-            .ignoresSafeArea()
+        ZStack {
+            Color(red: 0.95, green: 0.96, blue: 1.00)
+
+            Circle()
+                .fill(AppPalette.blue.opacity(0.10))
+                .frame(width: 300, height: 300)
+                .blur(radius: 42)
+                .offset(x: 180, y: -350)
+
+            Circle()
+                .fill(AppPalette.violet.opacity(0.08))
+                .frame(width: 360, height: 360)
+                .blur(radius: 50)
+                .offset(x: -190, y: 360)
+        }
+        .ignoresSafeArea()
     }
 }
 

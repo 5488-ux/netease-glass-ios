@@ -60,11 +60,11 @@ struct HomeView: View {
         HStack(spacing: 13) {
             ZStack {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(AppPalette.blue.opacity(0.13))
                     .frame(width: 58, height: 58)
                 Image(systemName: "waveform")
                     .font(.system(size: 25, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(AppPalette.blue)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -83,6 +83,7 @@ struct HomeView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
+            .foregroundStyle(AppPalette.violet)
             .appGlass(cornerRadius: 15)
             .accessibilityLabel(app.loginManager.isLoggedIn ? "账号" : "登录")
         }
@@ -94,9 +95,9 @@ struct HomeView: View {
             HStack(spacing: 12) {
                 Image(systemName: "qrcode")
                     .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(AppPalette.blue)
                     .frame(width: 40, height: 40)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(AppPalette.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("登录网易云音乐")
@@ -138,10 +139,10 @@ struct HomeView: View {
                 } label: {
                     Text(item.rawValue)
                         .font(.subheadline.weight(mode == item ? .semibold : .regular))
-                        .foregroundStyle(mode == item ? .primary : .secondary)
+                        .foregroundStyle(mode == item ? AppPalette.blue : Color.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(mode == item ? Color.primary.opacity(0.10) : .clear, in: Capsule())
+                        .background(mode == item ? AppPalette.blue.opacity(0.13) : .clear, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -154,7 +155,7 @@ struct HomeView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.body.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppPalette.blue)
             TextField(mode == .playlist ? "粘贴网易云歌单链接" : "搜索网易云音乐", text: $keyword)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -174,8 +175,8 @@ struct HomeView: View {
                 .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .background(Color.primary.opacity(0.09), in: Circle())
+            .foregroundStyle(AppPalette.blue)
+            .background(AppPalette.blue.opacity(0.13), in: Circle())
             .accessibilityLabel("搜索")
         }
         .padding(10)
@@ -204,11 +205,11 @@ struct HomeView: View {
         VStack(spacing: 9) {
             ZStack {
                 Circle()
-                    .fill(Color.primary.opacity(0.07))
+                    .fill(AppPalette.blue.opacity(0.13))
                     .frame(width: 66, height: 66)
                 Image(systemName: icon)
                     .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppPalette.blue)
             }
             Text(title)
                 .font(.subheadline.weight(.semibold))

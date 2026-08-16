@@ -29,6 +29,7 @@ struct SongCard: View {
                     .frame(width: 34, height: 34)
             }
             .buttonStyle(.borderless)
+            .foregroundStyle(AppPalette.blue)
             .accessibilityLabel(isPlaying ? "暂停试听" : "播放试听")
             Button {
                 app.downloadManager.enqueue(song: song)
@@ -37,10 +38,10 @@ struct SongCard: View {
                     .frame(width: 34, height: 34)
             }
             .buttonStyle(.borderless)
+            .foregroundStyle(AppPalette.orange)
             .accessibilityLabel("下载")
         }
         .padding(12)
         .appGlass(cornerRadius: 18)
     }
 }
-

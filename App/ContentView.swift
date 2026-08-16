@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var app: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -18,11 +19,15 @@ struct ContentView: View {
                     .tabItem { Label("设置", systemImage: "gearshape") }
                     .tag(AppTab.settings)
             }
-            .tint(.primary)
+            .tint(AppPalette.blue)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert("提示", isPresented: Binding(get: { app.alertMessage != nil }, set: { if !$0 { app.alertMessage = nil } })) {
             Button("知道了", role: .cancel) { app.alertMessage = nil }
         } message: { Text(app.alertMessage ?? "") }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, app.api.hasCookie else { return }
+            Task { await app.loginManager.refreshAccount() }
+        }
     }
 }
