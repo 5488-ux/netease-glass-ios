@@ -20,42 +20,34 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("发现音乐").font(.largeTitle.bold())
-                        Text("搜索、试听，保存你有权限下载的歌曲")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    Picker("搜索类型", selection: $mode) {
-                        ForEach(HomeSearchMode.allCases) { item in Text(item.rawValue).tag(item) }
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: mode) { _, _ in resetResults() }
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                        TextField(mode == .playlist ? "粘贴网易云歌单链接" : "搜索网易云音乐", text: $keyword)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .onSubmit { search() }
-                        if !keyword.isEmpty {
-                            Button { keyword = ""; resetResults() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+            ZStack {
+                AppPageBackground()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("发现")
+                                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                                Text("搜索、试听并保存你有权限下载的音乐")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "waveform")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 42, height: 42)
+                                .appGlass(cornerRadius: 14)
                         }
-                        Button { search() } label: {
-                            if isLoading { ProgressView().controlSize(.small) }
-                            else { Text("搜索").font(.subheadline.weight(.semibold)) }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
+                        modeSelector
+                        searchField
+                        content
                     }
-                    .padding(12)
-                    .appGlass(cornerRadius: 18)
-                    content
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 30)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-                .padding(.bottom, 30)
+                .scrollIndicators(.hidden)
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationBarTitleDisplayMode(.inline)
@@ -65,6 +57,57 @@ struct HomeView: View {
                 Button("知道了", role: .cancel) { errorMessage = nil }
             } message: { Text(errorMessage ?? "") }
         }
+    }
+
+    private var modeSelector: some View {
+        HStack(spacing: 4) {
+            ForEach(HomeSearchMode.allCases) { item in
+                Button {
+                    mode = item
+                    resetResults()
+                } label: {
+                    Text(item.rawValue)
+                        .font(.subheadline.weight(mode == item ? .semibold : .regular))
+                        .foregroundStyle(mode == item ? .primary : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(mode == item ? Color.primary.opacity(0.10) : .clear, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .appGlass(cornerRadius: 18)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.body.weight(.medium))
+                .foregroundStyle(.secondary)
+            TextField(mode == .playlist ? "粘贴网易云歌单链接" : "搜索网易云音乐", text: $keyword)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onSubmit { search() }
+            if !keyword.isEmpty {
+                Button { keyword = ""; resetResults() } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+            Button { search() } label: {
+                Group {
+                    if isLoading { ProgressView().controlSize(.small) }
+                    else { Image(systemName: "arrow.right") }
+                }
+                .font(.body.weight(.semibold))
+                .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("搜索")
+        }
+        .padding(11)
+        .appGlass(cornerRadius: 20)
     }
 
     @ViewBuilder private var content: some View {
@@ -82,12 +125,17 @@ struct HomeView: View {
     }
 
     private func emptyState(_ title: String, icon: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: icon).font(.title2).foregroundStyle(.secondary)
-            Text(title).font(.subheadline).foregroundStyle(.secondary)
+        VStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 55)
+        .padding(.vertical, 45)
+        .appGlass(cornerRadius: 22)
     }
 
     private func search() {
@@ -120,4 +168,3 @@ struct HomeView: View {
         return Int(id)
     }
 }
-

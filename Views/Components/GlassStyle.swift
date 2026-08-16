@@ -11,6 +11,13 @@ extension View {
     }
 }
 
+struct AppPageBackground: View {
+    var body: some View {
+        Color(uiColor: .systemGroupedBackground)
+            .ignoresSafeArea()
+    }
+}
+
 struct RemoteImage: View {
     let url: URL?
     var size: CGFloat
@@ -41,4 +48,3 @@ struct VIPBadge: View {
             .background(.red, in: Capsule())
     }
 }
-
