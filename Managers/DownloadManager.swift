@@ -2,6 +2,13 @@ import Foundation
 import Combine
 import UIKit
 
+enum DownloadEnqueueResult {
+    case queued
+    case restarted
+    case alreadyActive
+    case alreadyCompleted
+}
+
 @MainActor
 final class DownloadManager: NSObject, ObservableObject {
     @Published private(set) var tasks: [DownloadTask] = []
@@ -24,11 +31,27 @@ final class DownloadManager: NSObject, ObservableObject {
         createMusicDirectory()
     }
 
-    func enqueue(song: Song) {
-        if tasks.contains(where: { $0.song.id == song.id && $0.state != .failed }) { return }
+    @discardableResult
+    func enqueue(song: Song) -> DownloadEnqueueResult {
+        if let existing = tasks.first(where: { $0.song.id == song.id }) {
+            switch existing.state {
+            case .failed:
+                retry(existing)
+                return .restarted
+            case .completed:
+                return .alreadyCompleted
+            case .waiting, .downloading, .paused:
+                return .alreadyActive
+            }
+        }
         let id = UUID()
         tasks.insert(DownloadTask(id: id, song: song, state: .waiting, progress: 0, downloadedBytes: 0, totalBytes: 0, speedBytesPerSecond: 0, estimatedRemaining: nil, errorMessage: nil, fileURL: nil, resumeData: nil), at: 0)
         Task { await begin(id: id, song: song) }
+        return .queued
+    }
+
+    func task(for songID: Int) -> DownloadTask? {
+        tasks.first(where: { $0.song.id == songID })
     }
 
     func pause(_ task: DownloadTask) {
@@ -82,6 +105,7 @@ final class DownloadManager: NSObject, ObservableObject {
             else {
                 var request = URLRequest(url: permission.url)
                 request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
                 task = session.downloadTask(with: request)
             }
             activeTasks[task.taskIdentifier] = id
@@ -154,6 +178,13 @@ extension DownloadManager: URLSessionDownloadDelegate {
         Task { @MainActor in
             guard let id = self.activeTasks[downloadTask.taskIdentifier] else { return }
             self.activeTasks[downloadTask.taskIdentifier] = nil
+            if let response = downloadTask.response as? HTTPURLResponse, !(200..<300).contains(response.statusCode) {
+                let message = "音频服务器返回错误（HTTP \(response.statusCode)）"
+                self.update(id: id) { item in item.state = .failed; item.errorMessage = message }
+                self.errorHandler?(message)
+                self.persistCompletedTasks()
+                return
+            }
             await self.finish(id: id, location: location)
         }
     }

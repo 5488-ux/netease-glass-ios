@@ -5,7 +5,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             AppPageBackground()
             TabView(selection: $app.selectedTab) {
                 HomeView()
@@ -20,6 +20,13 @@ struct ContentView: View {
                     .tag(AppTab.settings)
             }
             .tint(AppPalette.blue)
+
+            if app.audioPlayer.currentSong != nil {
+                NowPlayingBar()
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 72)
+                    .zIndex(10)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert("提示", isPresented: Binding(get: { app.alertMessage != nil }, set: { if !$0 { app.alertMessage = nil } })) {

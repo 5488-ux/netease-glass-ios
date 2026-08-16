@@ -19,6 +19,7 @@
 		A1000000000000000000000A /* Song.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* Song.swift */; };
 		A1000000000000000000000B /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* User.swift */; };
 		A1000000000000000000001B /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* Account.swift */; };
+		A1000000000000000000001C /* NowPlayingBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001D /* NowPlayingBar.swift */; };
 		A1000000000000000000000C /* NeteaseAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* NeteaseAPI.swift */; };
 		A1000000000000000000000D /* FilenameSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* FilenameSanitizer.swift */; };
 		A1000000000000000000000E /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* KeychainStore.swift */; };
@@ -49,6 +50,7 @@
 		B1000000000000000000000A /* Song.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Song.swift; sourceTree = "<group>"; };
 		B1000000000000000000000B /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		B1000000000000000000001C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
+		B1000000000000000000001D /* NowPlayingBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingBar.swift; sourceTree = "<group>"; };
 		B1000000000000000000000C /* NeteaseAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeteaseAPI.swift; sourceTree = "<group>"; };
 		B1000000000000000000000D /* FilenameSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameSanitizer.swift; sourceTree = "<group>"; };
 		B1000000000000000000000E /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
@@ -85,7 +87,7 @@
 		C10000000000000000000006 /* Services */ = {isa = PBXGroup; children = (B1000000000000000000000C); name = Services; path = Services; sourceTree = "<group>"; };
 		C10000000000000000000007 /* Utilities */ = {isa = PBXGroup; children = (B1000000000000000000000D, B1000000000000000000000E, B1000000000000000000000F, B10000000000000000000010); name = Utilities; path = Utilities; sourceTree = "<group>"; };
 		C10000000000000000000008 /* Views */ = {isa = PBXGroup; children = (C10000000000000000000009, B10000000000000000000015, B10000000000000000000016, B10000000000000000000017, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001A); name = Views; path = Views; sourceTree = "<group>"; };
-		C10000000000000000000009 /* Components */ = {isa = PBXGroup; children = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, B10000000000000000000014); name = Components; path = Components; sourceTree = "<group>"; };
+		C10000000000000000000009 /* Components */ = {isa = PBXGroup; children = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, B10000000000000000000014, B1000000000000000000001D); name = Components; path = Components; sourceTree = "<group>"; };
 		C1000000000000000000000A /* Products */ = {isa = PBXGroup; children = (B1000000000000000000001B); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -182,6 +184,7 @@
 				A10000000000000000000018,
 				A10000000000000000000019,
 				A1000000000000000000001A,
+				A1000000000000000000001C,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -195,11 +198,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -217,11 +220,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 enum AppTab: Hashable {
     case home
@@ -16,6 +17,7 @@ final class AppModel: ObservableObject {
     let loginManager: LoginManager
     let audioPlayer: AudioPlayerManager
     let downloadManager: DownloadManager
+    private var cancellables: Set<AnyCancellable> = []
 
     init() {
         let api = NeteaseAPI(cookie: KeychainStore.loadCookie() ?? "")
@@ -25,5 +27,10 @@ final class AppModel: ObservableObject {
         downloadManager = DownloadManager(api: api)
         audioPlayer.errorHandler = { [weak self] message in self?.alertMessage = message }
         downloadManager.errorHandler = { [weak self] message in self?.alertMessage = message }
+
+        loginManager.objectWillChange
+            .merge(with: audioPlayer.objectWillChange, downloadManager.objectWillChange)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 }

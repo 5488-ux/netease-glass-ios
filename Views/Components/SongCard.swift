@@ -5,6 +5,8 @@ struct SongCard: View {
     let song: Song
 
     private var isPlaying: Bool { app.audioPlayer.playingSongID == song.id && app.audioPlayer.isPlaying }
+    private var isLoadingAudio: Bool { app.audioPlayer.playingSongID == song.id && app.audioPlayer.isLoading }
+    private var downloadTask: DownloadTask? { app.downloadManager.task(for: song.id) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -25,19 +27,42 @@ struct SongCard: View {
             Button {
                 app.audioPlayer.toggle(song: song)
             } label: {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
+                Group {
+                    if isLoadingAudio {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(AppPalette.blue)
             .accessibilityLabel(isPlaying ? "暂停试听" : "播放试听")
             Button {
-                app.downloadManager.enqueue(song: song)
+                switch app.downloadManager.enqueue(song: song) {
+                case .queued, .restarted:
+                    break
+                case .alreadyActive:
+                    app.alertMessage = "这首歌曲已经在下载列表中"
+                case .alreadyCompleted:
+                    app.alertMessage = "这首歌曲已经下载完成"
+                }
             } label: {
-                Image(systemName: "arrow.down.circle")
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
+                Group {
+                    if downloadTask?.state == .waiting || downloadTask?.state == .downloading {
+                        ProgressView().controlSize(.small)
+                    } else if downloadTask?.state == .completed {
+                        Image(systemName: "checkmark.circle.fill")
+                    } else if downloadTask?.state == .failed {
+                        Image(systemName: "arrow.clockwise.circle")
+                    } else {
+                        Image(systemName: "arrow.down.circle")
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(AppPalette.orange)
@@ -47,5 +72,6 @@ struct SongCard: View {
         .padding(12)
         .appGlass(cornerRadius: 18)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }

@@ -12,9 +12,17 @@ extension View {
     @ViewBuilder
     func appGlass(cornerRadius: CGFloat = 20) -> some View {
         if #available(iOS 26.0, *) {
-            glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+            background {
+                Color.clear
+                    .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                    .allowsHitTesting(false)
+            }
         } else {
-            background(.thinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.thinMaterial)
+                    .allowsHitTesting(false)
+            }
         }
     }
 }
@@ -73,11 +81,17 @@ struct AppSectionHeader: View {
 struct RemoteImage: View {
     let url: URL?
     var size: CGFloat
-    @State private var image: UIImage?
+    @StateObject private var loader: RemoteImageLoader
+
+    init(url: URL?, size: CGFloat) {
+        self.url = url
+        self.size = size
+        _loader = StateObject(wrappedValue: RemoteImageLoader(url: url))
+    }
 
     var body: some View {
         ZStack {
-            if let image {
+            if let image = loader.image {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
                 AppPalette.blue.opacity(0.15)
@@ -89,21 +103,51 @@ struct RemoteImage: View {
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityHidden(true)
-        .task(id: url) { await loadImage() }
+        .task(id: url) { await loader.load() }
+    }
+}
+
+@MainActor
+private final class RemoteImageLoader: ObservableObject {
+    @Published private(set) var image: UIImage?
+    private let url: URL?
+
+    init(url: URL?) {
+        self.url = url
     }
 
-    private func loadImage() async {
+    func load() async {
+        guard image == nil else { return }
         image = nil
         guard let url else { return }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 20
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-        request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode),
-              let loaded = UIImage(data: data) else { return }
-        image = loaded
+        for candidate in Self.candidates(for: url) {
+            var request = URLRequest(url: candidate)
+            request.timeoutInterval = 20
+            request.cachePolicy = .returnCacheDataElseLoad
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+            request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let loaded = UIImage(data: data) else { continue }
+            image = loaded
+            return
+        }
+    }
+
+    private static func candidates(for url: URL) -> [URL] {
+        var result: [URL] = []
+        if var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.scheme = "https"
+            var items = components.queryItems ?? []
+            if !items.contains(where: { $0.name == "param" }) {
+                items.append(URLQueryItem(name: "param", value: "300y300"))
+                components.queryItems = items
+            }
+            if let resized = components.url { result.append(resized) }
+        }
+        if !result.contains(url) { result.append(url) }
+        return result
     }
 }
 
