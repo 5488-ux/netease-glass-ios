@@ -1,0 +1,115 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* NeteaseGlassApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* NeteaseGlassApp.swift */; };
+		A10000000000000000000002 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* AppModel.swift */; };
+		A10000000000000000000003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* ContentView.swift */; };
+		A10000000000000000000004 /* AudioPlayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* AudioPlayerManager.swift */; };
+		A10000000000000000000005 /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* DownloadManager.swift */; };
+		A10000000000000000000006 /* LoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* LoginManager.swift */; };
+		A10000000000000000000007 /* DownloadTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* DownloadTask.swift */; };
+		A10000000000000000000008 /* Playlist.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* Playlist.swift */; };
+		A10000000000000000000009 /* QRLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* QRLogin.swift */; };
+		A1000000000000000000000A /* Song.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* Song.swift */; };
+		A1000000000000000000000B /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* User.swift */; };
+		A1000000000000000000001B /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* Account.swift */; };
+		A1000000000000000000000C /* NeteaseAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* NeteaseAPI.swift */; };
+		A1000000000000000000000D /* FilenameSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* FilenameSanitizer.swift */; };
+		A1000000000000000000000E /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* KeychainStore.swift */; };
+		A1000000000000000000000F /* MP3MetadataWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* MP3MetadataWriter.swift */; };
+		A10000000000000000000010 /* QRCodeRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* QRCodeRenderer.swift */; };
+		A10000000000000000000011 /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* GlassStyle.swift */; };
+		A10000000000000000000012 /* PlaylistCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* PlaylistCard.swift */; };
+		A10000000000000000000013 /* SongCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* SongCard.swift */; };
+		A10000000000000000000014 /* UserCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* UserCard.swift */; };
+		A10000000000000000000015 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* DownloadsView.swift */; };
+		A10000000000000000000016 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* HomeView.swift */; };
+		A10000000000000000000017 /* PlaylistDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* PlaylistDetailView.swift */; };
+		A10000000000000000000018 /* QRLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* QRLoginView.swift */; };
+		A10000000000000000000019 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* SettingsView.swift */; };
+		A1000000000000000000001A /* UserDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* UserDetailView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B10000000000000000000001 /* NeteaseGlassApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeteaseGlassApp.swift; sourceTree = "<group>"; };
+		B10000000000000000000002 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		B10000000000000000000003 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B10000000000000000000004 /* AudioPlayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerManager.swift; sourceTree = "<group>"; };
+		B10000000000000000000005 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
+		B10000000000000000000006 /* LoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginManager.swift; sourceTree = "<group>"; };
+		B10000000000000000000007 /* DownloadTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadTask.swift; sourceTree = "<group>"; };
+		B10000000000000000000008 /* Playlist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playlist.swift; sourceTree = "<group>"; };
+		B10000000000000000000009 /* QRLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRLogin.swift; sourceTree = "<group>"; };
+		B1000000000000000000000A /* Song.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Song.swift; sourceTree = "<group>"; };
+		B1000000000000000000000B /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		B1000000000000000000001C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
+		B1000000000000000000000C /* NeteaseAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeteaseAPI.swift; sourceTree = "<group>"; };
+		B1000000000000000000000D /* FilenameSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameSanitizer.swift; sourceTree = "<group>"; };
+		B1000000000000000000000E /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		B1000000000000000000000F /* MP3MetadataWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MP3MetadataWriter.swift; sourceTree = "<group>"; };
+		B10000000000000000000010 /* QRCodeRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
+		B10000000000000000000011 /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 /* PlaylistCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistCard.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 /* SongCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongCard.swift; sourceTree = "<group>"; };
+		B10000000000000000000014 /* UserCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserCard.swift; sourceTree = "<group>"; };
+		B10000000000000000000015 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
+		B10000000000000000000016 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		B10000000000000000000017 /* PlaylistDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistDetailView.swift; sourceTree = "<group>"; };
+		B10000000000000000000018 /* QRLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRLoginView.swift; sourceTree = "<group>"; };
+		B10000000000000000000019 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B1000000000000000000001A /* UserDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailView.swift; sourceTree = "<group>"; };
+		B1000000000000000000001B /* NeteaseGlass.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NeteaseGlass.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C10000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C10000000000000000000002 = {isa = PBXGroup; children = (C10000000000000000000003, C10000000000000000000004, C10000000000000000000005, C10000000000000000000006, C10000000000000000000007, C10000000000000000000008, C10000000000000000000009, C1000000000000000000000A, C1000000000000000000000B, C1000000000000000000000C, C1000000000000000000000D, C1000000000000000000000E, C1000000000000000000000F, C10000000000000000000010, C10000000000000000000011, C10000000000000000000012, C10000000000000000000013, C10000000000000000000014, C10000000000000000000015, C10000000000000000000016, C10000000000000000000017, C10000000000000000000018, C10000000000000000000019, C1000000000000000000001A, C1000000000000000000001B); sourceTree = "<group>"; };
+		C10000000000000000000003 /* NeteaseGlass */ = {isa = PBXGroup; children = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003); name = App; path = App; sourceTree = "<group>"; };
+		C10000000000000000000004 /* Managers */ = {isa = PBXGroup; children = (B10000000000000000000004, B10000000000000000000005, B10000000000000000000006); name = Managers; path = Managers; sourceTree = "<group>"; };
+		C10000000000000000000005 /* Models */ = {isa = PBXGroup; children = (B10000000000000000000007, B10000000000000000000008, B10000000000000000000009, B1000000000000000000000A, B1000000000000000000000B, B1000000000000000000001C); name = Models; path = Models; sourceTree = "<group>"; };
+		C10000000000000000000006 /* Services */ = {isa = PBXGroup; children = (B1000000000000000000000C); name = Services; path = Services; sourceTree = "<group>"; };
+		C10000000000000000000007 /* Utilities */ = {isa = PBXGroup; children = (B1000000000000000000000D, B1000000000000000000000E, B1000000000000000000000F, B10000000000000000000010); name = Utilities; path = Utilities; sourceTree = "<group>"; };
+		C10000000000000000000008 /* Views */ = {isa = PBXGroup; children = (C10000000000000000000009, B10000000000000000000015, B10000000000000000000016, B10000000000000000000017, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001A); name = Views; path = Views; sourceTree = "<group>"; };
+		C10000000000000000000009 /* Components */ = {isa = PBXGroup; children = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, B10000000000000000000014); name = Components; path = Components; sourceTree = "<group>"; };
+		C1000000000000000000000A /* Products */ = {isa = PBXGroup; children = (B1000000000000000000001B); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D10000000000000000000001 /* NeteaseGlass */ = {isa = PBXNativeTarget; buildConfigurationList = D10000000000000000000004; buildPhases = (D10000000000000000000002, C10000000000000000000001, D10000000000000000000003); buildRules = (); dependencies = (); name = NeteaseGlass; productName = NeteaseGlass; productReference = B1000000000000000000001B; productType = "com.apple.product-type.application"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D10000000000000000000005 /* Project object */ = {isa = PBXProject; attributes = { LastUpgradeCheck = 2600; TargetAttributes = { D10000000000000000000001 = { CreatedOnToolsVersion = 26.0; }; }; }; buildConfigurationList = D10000000000000000000006; compatibilityVersion = "Xcode 16.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = C10000000000000000000002; productRefGroup = C1000000000000000000000A; projectDirPath = ""; projectRoot = ""; targets = (D10000000000000000000001); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D10000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D10000000000000000000002 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A10000000000000000000007, A10000000000000000000008, A10000000000000000000009, A1000000000000000000000A, A1000000000000000000000B, A1000000000000000000001B, A1000000000000000000000C, A1000000000000000000000D, A1000000000000000000000E, A1000000000000000000000F, A10000000000000000000010, A10000000000000000000011, A10000000000000000000012, A10000000000000000000013, A10000000000000000000014, A10000000000000000000015, A10000000000000000000016, A10000000000000000000017, A10000000000000000000018, A10000000000000000000019, A1000000000000000000001A); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		D10000000000000000000007 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = NeteaseGlass; IPHONEOS_DEPLOYMENT_TARGET = 26.0; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.10; TARGETED_DEVICE_FAMILY = "1,2"; };
+		D10000000000000000000008 /* Release */ = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = NeteaseGlass; IPHONEOS_DEPLOYMENT_TARGET = 26.0; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 5.10; TARGETED_DEVICE_FAMILY = "1,2"; };
+		D10000000000000000000009 /* Project Debug */ = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.10; }; };
+		D1000000000000000000000A /* Project Release */ = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.10; }; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D10000000000000000000004 /* Build configuration list for PBXNativeTarget */ = {isa = XCConfigurationList; buildConfigurations = (D10000000000000000000007, D10000000000000000000008); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		D10000000000000000000006 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (D10000000000000000000009, D1000000000000000000000A); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = D10000000000000000000005 /* Project object */;
+}

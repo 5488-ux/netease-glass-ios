@@ -1,0 +1,25 @@
+import SwiftUI
+
+struct ContentView: View {
+    @EnvironmentObject private var app: AppModel
+
+    var body: some View {
+        TabView(selection: $app.selectedTab) {
+            HomeView()
+                .tabItem { Label("主页", systemImage: "house") }
+                .tag(AppTab.home)
+            DownloadsView()
+                .tabItem { Label("下载", systemImage: "arrow.down.circle") }
+                .badge(app.downloadManager.tasks.filter { $0.state == .downloading || $0.state == .waiting }.count)
+                .tag(AppTab.downloads)
+            SettingsView()
+                .tabItem { Label("设置", systemImage: "gearshape") }
+                .tag(AppTab.settings)
+        }
+        .tint(.primary)
+        .alert("提示", isPresented: Binding(get: { app.alertMessage != nil }, set: { if !$0 { app.alertMessage = nil } })) {
+            Button("知道了", role: .cancel) { app.alertMessage = nil }
+        } message: { Text(app.alertMessage ?? "") }
+    }
+}
+
