@@ -36,6 +36,7 @@ struct AppPageBackground: View {
                 .offset(x: -190, y: 360)
         }
         .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }
 
@@ -77,8 +78,10 @@ struct RemoteImage: View {
                 image.resizable().scaledToFill()
             } else {
                 ZStack {
-                    Color.secondary.opacity(0.12)
-                    Image(systemName: "music.note").font(.title3).foregroundStyle(.secondary)
+                    AppPalette.blue.opacity(0.15)
+                    Image(systemName: "music.note")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(AppPalette.blue)
                 }
             }
         }

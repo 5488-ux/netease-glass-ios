@@ -27,7 +27,7 @@ final class LoginManager: ObservableObject {
             account = try await api.account()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = NeteaseAPIError.userMessage(for: error)
         }
     }
 
@@ -42,7 +42,7 @@ final class LoginManager: ObservableObject {
             try KeychainStore.saveCookie(cookie)
             api.updateCookie(cookie)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = NeteaseAPIError.userMessage(for: error)
             return false
         }
 

@@ -38,7 +38,7 @@ struct UserDetailView: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
             .task {
                 do { detail = try await app.api.loadUser(user) }
-                catch { errorMessage = error.localizedDescription }
+                catch { errorMessage = NeteaseAPIError.userMessage(for: error) }
                 isLoading = false
             }
             .sheet(item: $selectedPlaylist) { PlaylistDetailView(playlist: $0) }
@@ -46,4 +46,3 @@ struct UserDetailView: View {
         }
     }
 }
-

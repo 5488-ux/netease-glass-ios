@@ -91,6 +91,13 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingLogin) { QRLoginView() }
             .sheet(item: $selectedPlaylist) { PlaylistDetailView(playlist: $0) }
+            .alert("刷新登录状态失败", isPresented: Binding(get: {
+                app.loginManager.isLoggedIn && app.loginManager.errorMessage != nil
+            }, set: { if !$0 { app.loginManager.errorMessage = nil } })) {
+                Button("知道了", role: .cancel) { app.loginManager.errorMessage = nil }
+            } message: {
+                Text(app.loginManager.errorMessage ?? "")
+            }
         }
     }
 

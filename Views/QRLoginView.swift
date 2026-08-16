@@ -77,7 +77,7 @@ struct QRLoginView: View {
             do {
                 let newSession = try await app.api.createQRLogin()
                 session = newSession; isLoading = false; startPolling(newSession)
-            } catch { isLoading = false; errorMessage = error.localizedDescription }
+            } catch { isLoading = false; errorMessage = NeteaseAPIError.userMessage(for: error) }
         }
     }
 

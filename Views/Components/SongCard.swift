@@ -41,7 +41,9 @@ struct SongCard: View {
             .foregroundStyle(AppPalette.orange)
             .accessibilityLabel("下载")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .appGlass(cornerRadius: 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

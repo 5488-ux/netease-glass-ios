@@ -17,8 +17,9 @@ struct PlaylistCard: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(11)
         .appGlass(cornerRadius: 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
-

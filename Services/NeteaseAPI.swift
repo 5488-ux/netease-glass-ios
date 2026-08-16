@@ -20,6 +20,32 @@ enum NeteaseAPIError: LocalizedError {
         case let .downloadUnavailable(value): return value
         }
     }
+
+    static func userMessage(for error: Error) -> String {
+        if let apiError = error as? NeteaseAPIError {
+            return apiError.errorDescription ?? "网易云请求失败"
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet:
+                return "网络未连接，请检查网络后重试"
+            case .timedOut:
+                return "请求超时，请稍后重试"
+            case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
+                return "无法连接网易云服务，请检查网络后重试"
+            case .networkConnectionLost:
+                return "网络连接中断，请返回应用后重试"
+            default:
+                return "网络请求失败，请稍后重试"
+            }
+        }
+
+        let message = error.localizedDescription
+        if message.range(of: "[\\u{4E00}-\\u{9FFF}]", options: .regularExpression) != nil {
+            return message
+        }
+        return "请求失败，请检查网络后重试"
+    }
 }
 
 final class NeteaseAPI {
@@ -254,19 +280,19 @@ final class NeteaseAPI {
         let coverString = (album["picUrl"] as? String) ?? (raw["picUrl"] as? String) ?? ""
         let fee = int(raw["fee"]) ?? 0
         let vip = fee == 1 || fee == 4 || fee == 8
-        return Song(id: id, name: name, artist: artists.joined(separator: "、"), album: album["name"] as? String ?? "未知专辑", duration: Double(int(raw["duration"] ?? raw["dt"]) ?? 0) / 1000, coverURL: URL(string: coverString), fee: fee, isVIP: vip, size: nil, bitrate: nil)
+        return Song(id: id, name: name, artist: artists.joined(separator: "、"), album: album["name"] as? String ?? "未知专辑", duration: Double(int(raw["duration"] ?? raw["dt"]) ?? 0) / 1000, coverURL: secureURL(coverString), fee: fee, isVIP: vip, size: nil, bitrate: nil)
     }
 
     private func parsePlaylist(_ raw: [String: Any]) -> Playlist? {
         guard let id = int(raw["id"]), let name = raw["name"] as? String else { return nil }
         let creator = raw["creator"] as? [String: Any]
         let cover = raw["coverImgUrl"] as? String ?? raw["picUrl"] as? String ?? ""
-        return Playlist(id: id, name: name, creatorName: creator?["nickname"] as? String ?? "未知创建者", description: raw["description"] as? String ?? "", trackCount: int(raw["trackCount"] ?? raw["trackNumberUpdateTime"]) ?? 0, coverURL: URL(string: cover))
+        return Playlist(id: id, name: name, creatorName: creator?["nickname"] as? String ?? "未知创建者", description: raw["description"] as? String ?? "", trackCount: int(raw["trackCount"] ?? raw["trackNumberUpdateTime"]) ?? 0, coverURL: secureURL(cover))
     }
 
     private func parseUser(_ raw: [String: Any]) -> NeteaseUser? {
         guard let id = int(raw["userId"] ?? raw["id"]), let nickname = raw["nickname"] as? String else { return nil }
-        return NeteaseUser(id: id, nickname: nickname, signature: raw["signature"] as? String ?? "暂无简介", avatarURL: URL(string: raw["avatarUrl"] as? String ?? ""), level: int(raw["level"]), vipType: int(raw["vipType"]))
+        return NeteaseUser(id: id, nickname: nickname, signature: raw["signature"] as? String ?? "暂无简介", avatarURL: secureURL(raw["avatarUrl"] as? String ?? ""), level: int(raw["level"]), vipType: int(raw["vipType"]))
     }
 
     private func int(_ value: Any?) -> Int? {
@@ -282,6 +308,14 @@ final class NeteaseAPI {
         if let value = value as? Int { return Int64(value) }
         if let value = value as? NSNumber { return value.int64Value }
         return nil
+    }
+
+    private func secureURL(_ value: String) -> URL? {
+        guard var components = URLComponents(string: value) else { return nil }
+        if components.scheme?.lowercased() == "http" {
+            components.scheme = "https"
+        }
+        return components.url
     }
 
     private static func cookieHeader(from response: HTTPURLResponse) -> String {

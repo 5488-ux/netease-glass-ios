@@ -88,9 +88,10 @@ final class DownloadManager: NSObject, ObservableObject {
             update(id: id) { item in item.state = .downloading; item.totalBytes = max(item.totalBytes, permission.totalBytes); item.resumeData = nil }
             task.resume()
         } catch {
-            update(id: id) { item in item.state = .failed; item.errorMessage = error.localizedDescription }
-            errorMessage = error.localizedDescription
-            errorHandler?(error.localizedDescription)
+            let message = NeteaseAPIError.userMessage(for: error)
+            update(id: id) { item in item.state = .failed; item.errorMessage = message }
+            errorMessage = message
+            errorHandler?(message)
         }
     }
 
@@ -130,7 +131,9 @@ final class DownloadManager: NSObject, ObservableObject {
             update(id: id) { item in item.state = .completed; item.progress = 1; item.fileURL = finalURL; item.downloadedBytes = Int64(tagged.count); item.totalBytes = Int64(tagged.count); item.estimatedRemaining = 0; item.errorMessage = nil }
             persistCompletedTasks()
         } catch {
-            update(id: id) { item in item.state = .failed; item.errorMessage = error.localizedDescription }
+            let message = NeteaseAPIError.userMessage(for: error)
+            update(id: id) { item in item.state = .failed; item.errorMessage = message }
+            errorHandler?(message)
         }
     }
 
@@ -183,7 +186,9 @@ extension DownloadManager: URLSessionDownloadDelegate {
             if let resumeData = nsError.userInfo[NSURLSessionDownloadTaskResumeData] as? Data {
                 self.update(id: id) { item in item.state = .paused; item.resumeData = resumeData; item.errorMessage = nil }
             } else {
-                self.update(id: id) { item in item.state = .failed; item.errorMessage = error.localizedDescription }
+                let message = NeteaseAPIError.userMessage(for: error)
+                self.update(id: id) { item in item.state = .failed; item.errorMessage = message }
+                self.errorHandler?(message)
             }
             self.persistCompletedTasks()
         }

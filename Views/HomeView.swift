@@ -241,7 +241,7 @@ struct HomeView: View {
                     guard let id = Self.playlistID(from: value) else { throw NeteaseAPIError.message("没有识别到有效的网易云歌单链接") }
                     selectedPlaylist = try await app.api.playlist(id: id)
                 }
-            } catch { errorMessage = error.localizedDescription }
+            } catch { errorMessage = NeteaseAPIError.userMessage(for: error) }
             isLoading = false
         }
     }
