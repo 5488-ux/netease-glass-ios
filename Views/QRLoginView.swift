@@ -29,7 +29,12 @@ struct QRLoginView: View {
                     } else if status == .success {
                         Button("完成") { dismiss() }.buttonStyle(.borderedProminent).tint(AppPalette.blue)
                     } else {
-                        ProgressView().tint(AppPalette.blue).controlSize(.small)
+                        HStack(spacing: 12) {
+                            ProgressView().tint(AppPalette.blue).controlSize(.small)
+                            Button("刷新登录状态") { refreshStatus() }
+                                .buttonStyle(.bordered)
+                                .tint(AppPalette.blue)
+                        }
                     }
                 } else if isLoading {
                     ProgressView("正在生成二维码…").tint(AppPalette.blue)
@@ -87,13 +92,12 @@ struct QRLoginView: View {
                     status = newStatus
                     errorMessage = nil
                     if newStatus == .success {
-                        let accountLoaded = await app.loginManager.finishLogin(with: app.api.currentCookie)
-                        if accountLoaded {
+                        if completeLogin() {
                             status = .success
                             return
                         }
-                        status = .scanned
-                        errorMessage = "扫码已确认，正在重试读取账号资料…"
+                        status = .failed
+                        return
                     }
                     if newStatus == .expired || newStatus == .failed { return }
                 } catch is CancellationError {
@@ -103,5 +107,43 @@ struct QRLoginView: View {
                 }
             }
         }
+    }
+
+    private func refreshStatus() {
+        guard let session else {
+            createSession()
+            return
+        }
+        pollTask?.cancel()
+        errorMessage = nil
+
+        Task {
+            do {
+                let newStatus = try await app.api.checkQRLogin(session)
+                status = newStatus
+                if newStatus == .success {
+                    if completeLogin() {
+                        status = .success
+                        return
+                    }
+                    status = .failed
+                    return
+                }
+                if newStatus != .expired && newStatus != .failed {
+                    startPolling(session)
+                }
+            } catch {
+                errorMessage = "刷新状态失败，请确认网络后重试"
+                startPolling(session)
+            }
+        }
+    }
+
+    private func completeLogin() -> Bool {
+        let saved = app.loginManager.finishLogin(with: app.api.currentCookie)
+        if !saved {
+            errorMessage = app.loginManager.errorMessage ?? "登录成功但凭证保存失败"
+        }
+        return saved
     }
 }

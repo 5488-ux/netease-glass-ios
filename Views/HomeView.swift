@@ -33,6 +33,7 @@ struct HomeView: View {
                         searchSection
                         content
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 30)
@@ -127,6 +128,7 @@ struct HomeView: View {
             modeSelector
             searchField
         }
+        .padding(16)
         .appGlass(cornerRadius: 24)
     }
 

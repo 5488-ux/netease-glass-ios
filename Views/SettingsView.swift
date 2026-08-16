@@ -44,6 +44,8 @@ struct SettingsView: View {
                             Button("退出登录", role: .destructive) { app.loginManager.logout() }
                                 .frame(maxWidth: .infinity)
                                 .padding(.top, 4)
+                        } else if app.loginManager.isLoggedIn {
+                            savedLoginCard
                         } else {
                             VStack(alignment: .leading, spacing: 14) {
                                 Image(systemName: "person.crop.circle.badge.plus")
@@ -75,9 +77,12 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(15)
                         .appGlass(cornerRadius: 18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 30)
@@ -87,6 +92,35 @@ struct SettingsView: View {
             .sheet(isPresented: $showingLogin) { QRLoginView() }
             .sheet(item: $selectedPlaylist) { PlaylistDetailView(playlist: $0) }
         }
+    }
+
+    private var savedLoginCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 32, weight: .semibold))
+                .foregroundStyle(AppPalette.violet)
+            Text("网易云登录凭证已保存")
+                .font(.title3.bold())
+            Text("账号资料和歌单会在网络可用时自动加载；也可以手动刷新当前登录状态。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button {
+                Task { await app.loginManager.refreshAccount() }
+            } label: {
+                Label(app.loginManager.isLoading ? "正在刷新…" : "刷新登录状态", systemImage: "arrow.clockwise")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppPalette.violet)
+            .disabled(app.loginManager.isLoading)
+            Button("重新扫码登录") { showingLogin = true }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .appGlass(cornerRadius: 22)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func accountHeader(_ user: NeteaseUser) -> some View {

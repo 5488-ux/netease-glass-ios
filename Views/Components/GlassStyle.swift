@@ -21,16 +21,16 @@ extension View {
 struct AppPageBackground: View {
     var body: some View {
         ZStack {
-            Color(red: 0.95, green: 0.96, blue: 1.00)
+            Color(red: 0.88, green: 0.92, blue: 1.00)
 
             Circle()
-                .fill(AppPalette.blue.opacity(0.10))
+                .fill(AppPalette.blue.opacity(0.26))
                 .frame(width: 300, height: 300)
                 .blur(radius: 42)
                 .offset(x: 180, y: -350)
 
             Circle()
-                .fill(AppPalette.violet.opacity(0.08))
+                .fill(AppPalette.violet.opacity(0.20))
                 .frame(width: 360, height: 360)
                 .blur(radius: 50)
                 .offset(x: -190, y: 360)

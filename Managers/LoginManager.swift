@@ -17,7 +17,7 @@ final class LoginManager: ObservableObject {
         }
     }
 
-    var isLoggedIn: Bool { account != nil && api.hasCookie }
+    var isLoggedIn: Bool { api.hasCookie }
 
     func refreshAccount() async {
         guard api.hasCookie else { account = nil; return }
@@ -25,14 +25,14 @@ final class LoginManager: ObservableObject {
         defer { isLoading = false }
         do {
             account = try await api.account()
+            errorMessage = nil
         } catch {
-            account = nil
             errorMessage = error.localizedDescription
         }
     }
 
     @discardableResult
-    func finishLogin(with cookie: String) async -> Bool {
+    func finishLogin(with cookie: String) -> Bool {
         guard !cookie.isEmpty else {
             errorMessage = "登录成功但没有拿到 Cookie"
             return false
@@ -46,25 +46,18 @@ final class LoginManager: ObservableObject {
             return false
         }
 
-        for attempt in 0..<4 {
-            do {
-                account = try await api.account()
-                errorMessage = nil
-                return true
-            } catch {
-                if attempt < 3 {
-                    try? await Task.sleep(for: .seconds(2))
-                }
-            }
+        errorMessage = nil
+        Task { [weak self] in
+            guard let self else { return }
+            await self.refreshAccount()
         }
-
-        errorMessage = "扫码已成功，账号资料暂时加载失败；保持网络后回到设置页会自动重试"
-        return false
+        return true
     }
 
     func logout() {
         KeychainStore.deleteCookie()
         api.updateCookie("")
         account = nil
+        errorMessage = nil
     }
 }

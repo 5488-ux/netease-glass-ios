@@ -127,7 +127,13 @@ final class NeteaseAPI {
     }
 
     func createQRLogin() async throws -> QRLoginSession {
-        let json = try await getRaw(url: URL(string: "https://interface.music.163.com/api/login/qrcode/unikey?type=3")!, method: "GET", body: nil)
+        var components = URLComponents(url: URL(string: "https://interface.music.163.com/api/login/qrcode/unikey")!, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "type", value: "3"),
+            URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))
+        ]
+        guard let requestURL = components.url else { throw NeteaseAPIError.invalidURL }
+        let json = try await getRaw(url: requestURL, method: "GET", body: nil)
         guard let code = int(json["code"]), code == 200, let key = json["unikey"] as? String,
               let loginURL = URL(string: "https://music.163.com/login?codekey=\(key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key)") else {
             throw NeteaseAPIError.message("二维码生成失败")
@@ -138,11 +144,15 @@ final class NeteaseAPI {
     func checkQRLogin(_ session: QRLoginSession) async throws -> QRLoginStatus {
         guard Date() < session.expiresAt else { return .expired }
         var components = URLComponents(url: URL(string: "https://interface.music.163.com/api/login/qrcode/client/login")!, resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]
         var request = URLRequest(url: components.url!)
         request.httpMethod = "POST"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpBody = "key=\(session.key.urlEncoded)&type=3".data(using: .utf8)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36 NeteaseMusicDesktop/3.0.18.203152", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
               let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let code = int(json["code"]) else {
