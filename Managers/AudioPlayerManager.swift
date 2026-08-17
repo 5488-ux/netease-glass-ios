@@ -44,6 +44,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var preferredLevel: String
+    @Published private(set) var volume: Float
 
     var errorHandler: ((String) -> Void)?
 
@@ -57,7 +58,11 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     init(api: NeteaseAPI) {
         self.api = api
         self.preferredLevel = UserDefaults.standard.string(forKey: "player.quality") ?? AudioQuality.standard.rawValue
+        self.volume = UserDefaults.standard.object(forKey: "player.volume") == nil
+            ? 1
+            : UserDefaults.standard.float(forKey: "player.volume")
         super.init()
+        player.volume = volume
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP])
         try? AVAudioSession.sharedInstance().setActive(true)
         installObservers()
@@ -152,6 +157,13 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         }
         guard playbackRequestID == requestID else { return }
         finishPlaybackFailure(lastError ?? NeteaseAPIError.message("播放失败：无法获取可播放的音频"))
+    }
+
+    func setVolume(_ value: Float) {
+        let clamped = min(max(value, 0), 1)
+        volume = clamped
+        player.volume = clamped
+        UserDefaults.standard.set(clamped, forKey: "player.volume")
     }
 
     private func startPlayback(with asset: AVURLAsset, requestID: UUID) async {

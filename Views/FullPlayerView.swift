@@ -1,5 +1,4 @@
 import AVKit
-import MediaPlayer
 import SwiftUI
 import UIKit
 
@@ -371,7 +370,14 @@ struct FullPlayerView: View {
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.62))
 
-            SystemVolumeSlider()
+            Slider(
+                value: Binding(
+                    get: { Double(player.volume) },
+                    set: { player.setVolume(Float($0)) }
+                ),
+                in: 0...1
+            )
+                .tint(.white.opacity(0.9))
                 .frame(maxWidth: .infinity)
                 .frame(height: 28)
 
@@ -487,28 +493,6 @@ struct FullPlayerView: View {
     private func timeText(_ value: TimeInterval) -> String {
         let seconds = max(0, Int(value.isFinite ? value : 0))
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
-    }
-}
-
-/// 使用系统音量控件，调节的是设备真实输出音量，不是假滑块。
-private struct SystemVolumeSlider: UIViewRepresentable {
-    func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView(frame: .zero)
-        view.showsRouteButton = false
-        view.showsVolumeSlider = true
-        configure(view)
-        return view
-    }
-
-    func updateUIView(_ uiView: MPVolumeView, context: Context) {
-        configure(uiView)
-    }
-
-    private func configure(_ view: MPVolumeView) {
-        guard let slider = view.subviews.compactMap({ $0 as? UISlider }).first else { return }
-        slider.minimumTrackTintColor = UIColor.white.withAlphaComponent(0.9)
-        slider.maximumTrackTintColor = UIColor.white.withAlphaComponent(0.2)
-        slider.thumbTintColor = .white
     }
 }
 
