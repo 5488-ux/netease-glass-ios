@@ -12,6 +12,7 @@ enum AppTab: Hashable {
 final class AppModel: ObservableObject {
     @Published var selectedTab: AppTab = .home
     @Published var alertMessage: String?
+    @Published var isFullPlayerPresented = false
 
     let api: NeteaseAPI
     let loginManager: LoginManager

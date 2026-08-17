@@ -24,9 +24,10 @@
     <true/>
     <key>NSAppTransportSecurity</key>
     <dict>
+        <!-- 注意：不能与 NSAllowsArbitraryLoadsForMedia 同时存在 —— 苹果规则：
+             只要出现 Media/WebContent/LocalNetworking 任一键，iOS 10+ 就会忽略
+             NSAllowsArbitraryLoads，导致 URLSession 下载 http 资源被 ATS 拦截（-1022） -->
         <key>NSAllowsArbitraryLoads</key>
-        <true/>
-        <key>NSAllowsArbitraryLoadsForMedia</key>
         <true/>
     </dict>
     <key>UIApplicationSceneManifest</key>

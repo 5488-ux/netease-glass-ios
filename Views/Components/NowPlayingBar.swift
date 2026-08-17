@@ -10,17 +10,26 @@ struct NowPlayingBar: View {
         if let song = player.currentSong {
             VStack(spacing: isCollapsed ? 7 : 12) {
                 HStack(spacing: 10) {
-                    RemoteImage(url: song.coverURL, size: isCollapsed ? 38 : 46)
+                    Button {
+                        app.isFullPlayerPresented = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            RemoteImage(url: song.coverURL, size: isCollapsed ? 38 : 46)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(song.name)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                        Text(isCollapsed ? remainingText : song.artist)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(song.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                                Text(isCollapsed ? remainingText : song.artist)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("打开全屏播放器")
 
                     Spacer(minLength: 4)
 

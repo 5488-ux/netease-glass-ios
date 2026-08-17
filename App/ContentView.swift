@@ -32,6 +32,9 @@ struct ContentView: View {
         .alert("提示", isPresented: Binding(get: { app.alertMessage != nil }, set: { if !$0 { app.alertMessage = nil } })) {
             Button("知道了", role: .cancel) { app.alertMessage = nil }
         } message: { Text(app.alertMessage ?? "") }
+        .fullScreenCover(isPresented: $app.isFullPlayerPresented) {
+            FullPlayerView()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, app.api.hasCookie else { return }
             Task { await app.loginManager.refreshAccount() }

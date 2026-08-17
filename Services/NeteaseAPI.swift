@@ -198,6 +198,14 @@ final class NeteaseAPI {
         throw NeteaseAPIError.downloadUnavailable(detail + "；可能受版权、地区或账号权限限制")
     }
 
+    /// 获取歌曲 LRC 歌词（按时间排序）
+    func lyrics(for songID: Int) async throws -> [LyricLine] {
+        try requireLogin()
+        let json = try await weAPI(path: "/weapi/song/lyric", payload: ["id": songID, "lv": -1, "tv": -1, "rv": -1], context: "获取歌词（歌曲 ID \(songID)）")
+        let lrc = (json["lrc"] as? [String: Any])?["lyric"] as? String ?? ""
+        return LyricsParser.parse(lrc)
+    }
+
     func imageData(url: URL?) async -> Data? {
         guard let url else { return nil }
         do {

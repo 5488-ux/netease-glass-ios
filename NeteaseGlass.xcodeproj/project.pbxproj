@@ -35,6 +35,8 @@
 		A10000000000000000000018 /* QRLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* QRLoginView.swift */; };
 		A10000000000000000000019 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* SettingsView.swift */; };
 		A1000000000000000000001A /* UserDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* UserDetailView.swift */; };
+		A1000000000000000000001E /* FullPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001E /* FullPlayerView.swift */; };
+		A1000000000000000000001F /* LyricLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001F /* LyricLine.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -66,6 +68,8 @@
 		B10000000000000000000018 /* QRLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRLoginView.swift; sourceTree = "<group>"; };
 		B10000000000000000000019 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B1000000000000000000001A /* UserDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailView.swift; sourceTree = "<group>"; };
+		B1000000000000000000001E /* FullPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPlayerView.swift; sourceTree = "<group>"; };
+		B1000000000000000000001F /* LyricLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricLine.swift; sourceTree = "<group>"; };
 		B1000000000000000000001B /* NeteaseGlass.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NeteaseGlass.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -83,10 +87,10 @@
 		C10000000000000000000002 = {isa = PBXGroup; children = (C10000000000000000000003, C10000000000000000000004, C10000000000000000000005, C10000000000000000000006, C10000000000000000000007, C10000000000000000000008, C1000000000000000000000A); sourceTree = "<group>"; };
 		C10000000000000000000003 /* NeteaseGlass */ = {isa = PBXGroup; children = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003); name = App; path = App; sourceTree = "<group>"; };
 		C10000000000000000000004 /* Managers */ = {isa = PBXGroup; children = (B10000000000000000000004, B10000000000000000000005, B10000000000000000000006); name = Managers; path = Managers; sourceTree = "<group>"; };
-		C10000000000000000000005 /* Models */ = {isa = PBXGroup; children = (B10000000000000000000007, B10000000000000000000008, B10000000000000000000009, B1000000000000000000000A, B1000000000000000000000B, B1000000000000000000001C); name = Models; path = Models; sourceTree = "<group>"; };
+		C10000000000000000000005 /* Models */ = {isa = PBXGroup; children = (B10000000000000000000007, B10000000000000000000008, B10000000000000000000009, B1000000000000000000000A, B1000000000000000000000B, B1000000000000000000001C, B1000000000000000000001F); name = Models; path = Models; sourceTree = "<group>"; };
 		C10000000000000000000006 /* Services */ = {isa = PBXGroup; children = (B1000000000000000000000C); name = Services; path = Services; sourceTree = "<group>"; };
 		C10000000000000000000007 /* Utilities */ = {isa = PBXGroup; children = (B1000000000000000000000D, B1000000000000000000000E, B1000000000000000000000F, B10000000000000000000010); name = Utilities; path = Utilities; sourceTree = "<group>"; };
-		C10000000000000000000008 /* Views */ = {isa = PBXGroup; children = (C10000000000000000000009, B10000000000000000000015, B10000000000000000000016, B10000000000000000000017, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001A); name = Views; path = Views; sourceTree = "<group>"; };
+		C10000000000000000000008 /* Views */ = {isa = PBXGroup; children = (C10000000000000000000009, B10000000000000000000015, B10000000000000000000016, B10000000000000000000017, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001A, B1000000000000000000001E); name = Views; path = Views; sourceTree = "<group>"; };
 		C10000000000000000000009 /* Components */ = {isa = PBXGroup; children = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, B10000000000000000000014, B1000000000000000000001D); name = Components; path = Components; sourceTree = "<group>"; };
 		C1000000000000000000000A /* Products */ = {isa = PBXGroup; children = (B1000000000000000000001B); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
@@ -185,6 +189,8 @@
 				A10000000000000000000019,
 				A1000000000000000000001A,
 				A1000000000000000000001C,
+				A1000000000000000000001E,
+				A1000000000000000000001F,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -198,11 +204,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 2.5;
+				MARKETING_VERSION = 2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -220,11 +226,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 2.5;
+				MARKETING_VERSION = 2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

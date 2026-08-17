@@ -25,8 +25,8 @@ Actions 工作流位于 `.github/workflows/build.yml`。它使用 macOS Runner�
 
 ## 版本
 
-- Marketing Version: `2.5`
-- Build Number: `18`
+- Marketing Version: `2.6`
+- Build Number: `19`
 
 ## 版本规则
 
