@@ -5,6 +5,7 @@ import UIKit
 /// 页面整体固定不滚动；封面模糊背景；歌词区域独立滚动并高亮跟随；支持音质选择
 struct FullPlayerView: View {
     @EnvironmentObject private var app: AppModel
+    @Environment(\.dismiss) private var dismiss
     @State private var lyrics: [LyricLine] = []
     @State private var lyricsLoading = false
     @State private var artworkImage: UIImage?
@@ -17,8 +18,11 @@ struct FullPlayerView: View {
             backgroundLayer
 
             VStack(spacing: 0) {
-                // 顶部留白，给覆盖层顶栏让位
-                Color.clear.frame(height: 54)
+                topBar
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                    .zIndex(100)
 
                 artwork
                 songInfo
@@ -29,12 +33,6 @@ struct FullPlayerView: View {
                     .padding(.bottom, 26)
             }
             .foregroundStyle(.white)
-        }
-        // 顶栏独立覆盖在最上层，永不丢失
-        .overlay(alignment: .top) {
-            topBar
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
         }
         .task(id: player.currentSong?.id) {
             await loadArtwork()
@@ -72,30 +70,35 @@ struct FullPlayerView: View {
     // MARK: - 顶栏（覆盖层：收起按钮 + 标题 + 音质选择）
 
     private var topBar: some View {
-        HStack {
-            Button {
-                app.isFullPlayerPresented = false
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("收起播放器")
-
-            Spacer()
-
+        ZStack {
             Text("正在播放")
                 .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
 
-            Spacer()
+            HStack(spacing: 12) {
+                Button {
+                    app.isFullPlayerPresented = false
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 46, height: 46)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.72), lineWidth: 1))
+                .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
+                .accessibilityLabel("收起播放器")
 
-            qualityMenu
+                Spacer(minLength: 50)
+
+                qualityMenu
+            }
         }
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .contentShape(Rectangle())
     }
 
     private var qualityMenu: some View {
@@ -112,14 +115,17 @@ struct FullPlayerView: View {
                 }
             }
         } label: {
-            Text(player.preferredLevelTitle)
+            Label(player.preferredLevelTitle, systemImage: "waveform")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+                .frame(minHeight: 46)
                 .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
+                .overlay(Capsule().strokeBorder(.white.opacity(0.72), lineWidth: 1))
+                .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
+                .contentShape(Capsule())
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("选择音质")
     }
 
@@ -207,7 +213,7 @@ struct FullPlayerView: View {
             HStack {
                 Text(timeText(player.currentTime))
                 Spacer()
-                Text(timeText(player.duration))
+                Text("还剩 \(Int(player.remainingTime.rounded(.up))) 秒")
             }
             .font(.caption2.monospacedDigit())
             .foregroundStyle(.white.opacity(0.6))

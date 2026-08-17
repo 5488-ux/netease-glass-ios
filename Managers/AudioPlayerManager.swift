@@ -52,6 +52,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var itemStatusObservation: NSKeyValueObservation?
     private var endObserver: NSObjectProtocol?
+    private var playbackRequestID = UUID()
 
     init(api: NeteaseAPI) {
         self.api = api
@@ -68,11 +69,21 @@ final class AudioPlayerManager: NSObject, ObservableObject {
 
     /// 切换音质：保存偏好，并立即用新音质重新加载当前歌曲
     func setPreferredLevel(_ level: String) {
-        guard AudioQuality(rawValue: level) != nil else { return }
+        guard AudioQuality(rawValue: level) != nil, level != preferredLevel else { return }
+        let resumeTime = currentTime
+        let shouldResumePlaying = isPlaying
         preferredLevel = level
         UserDefaults.standard.set(level, forKey: "player.quality")
         if let song = currentSong {
-            Task { await play(song: song) }
+            Task {
+                await play(song: song)
+                guard preferredLevel == level, playingSongID == song.id, player.currentItem != nil else { return }
+                seek(to: resumeTime)
+                if !shouldResumePlaying {
+                    player.pause()
+                    isPlaying = false
+                }
+            }
         }
     }
 
@@ -111,6 +122,8 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     }
 
     func play(song: Song) async {
+        let requestID = UUID()
+        playbackRequestID = requestID
         player.pause()
         itemStatusObservation = nil
         currentSong = song
@@ -125,22 +138,28 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         let attempts = AudioQuality.attempts(for: preferredLevel)
         var lastError: Error?
         for attempt in attempts {
+            guard playbackRequestID == requestID else { return }
             do {
                 let permission = try await api.resolveDownload(for: song, encodeType: attempt.encodeType, level: attempt.level)
+                guard playbackRequestID == requestID else { return }
                 let asset = try await loadPlayableAsset(from: permission)
-                await startPlayback(with: asset)
+                guard playbackRequestID == requestID else { return }
+                await startPlayback(with: asset, requestID: requestID)
                 return
             } catch {
                 lastError = error
             }
         }
+        guard playbackRequestID == requestID else { return }
         finishPlaybackFailure(lastError ?? NeteaseAPIError.message("播放失败：无法获取可播放的音频"))
     }
 
-    private func startPlayback(with asset: AVURLAsset) async {
+    private func startPlayback(with asset: AVURLAsset, requestID: UUID) async {
+        guard playbackRequestID == requestID else { return }
         if let loadedDuration = try? await asset.load(.duration), loadedDuration.seconds.isFinite, loadedDuration.seconds > 0 {
             duration = loadedDuration.seconds
         }
+        guard playbackRequestID == requestID else { return }
         let item = AVPlayerItem(asset: asset)
         observe(item)
         player.replaceCurrentItem(with: item)
@@ -211,6 +230,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     }
 
     func stop() {
+        playbackRequestID = UUID()
         player.pause()
         player.replaceCurrentItem(with: nil)
         itemStatusObservation = nil

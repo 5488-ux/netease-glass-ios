@@ -35,6 +35,9 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $app.isFullPlayerPresented) {
             FullPlayerView()
         }
+        .onChange(of: app.audioPlayer.currentSong?.id) { _, songID in
+            if songID == nil { app.isFullPlayerPresented = false }
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, app.api.hasCookie else { return }
             Task { await app.loginManager.refreshAccount() }
