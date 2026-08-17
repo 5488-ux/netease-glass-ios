@@ -8,6 +8,7 @@ struct FullPlayerView: View {
     @State private var lyrics: [LyricLine] = []
     @State private var lyricsLoading = false
     @State private var artworkImage: UIImage?
+    @State private var draggingProgress: Double?
 
     private var player: AudioPlayerManager { app.audioPlayer }
 
@@ -16,7 +17,9 @@ struct FullPlayerView: View {
             backgroundLayer
 
             VStack(spacing: 0) {
-                topBar
+                // 顶部留白，给覆盖层顶栏让位
+                Color.clear.frame(height: 54)
+
                 artwork
                 songInfo
                 lyricSection
@@ -26,6 +29,12 @@ struct FullPlayerView: View {
                     .padding(.bottom, 26)
             }
             .foregroundStyle(.white)
+        }
+        // 顶栏独立覆盖在最上层，永不丢失
+        .overlay(alignment: .top) {
+            topBar
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
         }
         .task(id: player.currentSong?.id) {
             await loadArtwork()
@@ -43,7 +52,7 @@ struct FullPlayerView: View {
                     .scaledToFill()
                     .blur(radius: 62)
                     .scaleEffect(1.9)
-                    .opacity(0.55)
+                    .opacity(0.6)
             } else {
                 LinearGradient(
                     colors: [Color(red: 0.13, green: 0.14, blue: 0.21), Color(red: 0.05, green: 0.06, blue: 0.10)],
@@ -51,12 +60,16 @@ struct FullPlayerView: View {
                     endPoint: .bottom
                 )
             }
-            Color.black.opacity(0.32)
+            // 保证浅色封面时白色控件依然清晰可见
+            Color.black.opacity(0.45)
+            LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .center)
+                .frame(height: 140)
+                .frame(maxHeight: .infinity, alignment: .top)
         }
         .ignoresSafeArea()
     }
 
-    // MARK: - 顶栏（收起按钮 + 标题 + 音质选择）
+    // MARK: - 顶栏（覆盖层：收起按钮 + 标题 + 音质选择）
 
     private var topBar: some View {
         HStack {
@@ -64,9 +77,11 @@ struct FullPlayerView: View {
                 app.isFullPlayerPresented = false
             } label: {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(.black.opacity(0.32), in: Circle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("收起播放器")
@@ -80,8 +95,6 @@ struct FullPlayerView: View {
 
             qualityMenu
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 4)
     }
 
     private var qualityMenu: some View {
@@ -100,9 +113,10 @@ struct FullPlayerView: View {
         } label: {
             Text(player.preferredLevelTitle)
                 .font(.caption.weight(.semibold))
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(.white.opacity(0.16), in: Capsule())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(.black.opacity(0.32), in: Capsule())
         }
         .accessibilityLabel("选择音质")
     }
@@ -112,12 +126,12 @@ struct FullPlayerView: View {
     private var artwork: some View {
         Group {
             if let song = player.currentSong {
-                RemoteImage(url: song.coverURL, size: 224)
+                RemoteImage(url: song.coverURL, size: 216)
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .shadow(color: .black.opacity(0.45), radius: 20, y: 10)
             }
         }
-        .padding(.top, 16)
+        .padding(.top, 12)
     }
 
     // MARK: - 歌曲信息
@@ -134,7 +148,7 @@ struct FullPlayerView: View {
                     .lineLimit(1)
             }
         }
-        .padding(.top, 14)
+        .padding(.top, 12)
         .padding(.horizontal, 24)
     }
 
@@ -174,7 +188,7 @@ struct FullPlayerView: View {
                 }
             }
         }
-        .padding(.top, 6)
+        .padding(.top, 4)
     }
 
     private var currentLyricIndex: Int? {
@@ -183,19 +197,11 @@ struct FullPlayerView: View {
         return lyrics.lastIndex { $0.time <= time } ?? 0
     }
 
-    // MARK: - 进度
+    // MARK: - 进度（Apple Music 风格细胶囊条）
 
     private var progressSection: some View {
-        VStack(spacing: 5) {
-            Slider(
-                value: Binding(
-                    get: { player.currentTime },
-                    set: { player.seek(to: $0) }
-                ),
-                in: 0...max(player.duration, 1)
-            )
-            .tint(.white)
-
+        VStack(spacing: 4) {
+            progressBar
             HStack {
                 Text(timeText(player.currentTime))
                 Spacer()
@@ -206,6 +212,43 @@ struct FullPlayerView: View {
         }
         .padding(.horizontal, 26)
         .padding(.top, 2)
+    }
+
+    private var progressBar: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let ratio = draggingProgress ?? (player.duration > 0 ? player.currentTime / player.duration : 0)
+            let filled = max(0, min(1, ratio))
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.white.opacity(0.22))
+                    .frame(height: 5)
+                Capsule()
+                    .fill(.white)
+                    .frame(width: max(0, width * filled), height: 5)
+                if draggingProgress != nil {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 13, height: 13)
+                        .offset(x: max(0, width * filled) - 6.5)
+                }
+            }
+            .frame(maxHeight: .infinity, alignment: .center)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        draggingProgress = min(max(value.location.x / max(width, 1), 0), 1)
+                    }
+                    .onEnded { _ in
+                        if let ratio = draggingProgress {
+                            player.seek(to: ratio * max(player.duration, 0))
+                        }
+                        draggingProgress = nil
+                    }
+            )
+        }
+        .frame(height: 22)
     }
 
     // MARK: - 控制
