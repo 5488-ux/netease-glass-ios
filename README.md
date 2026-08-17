@@ -9,7 +9,8 @@
 - 网易云用户搜索、公开歌单浏览
 - 二维码登录、登录状态持久化和账号歌单
 - 可暂停、继续、重试和删除的下载队列
-- 可展开和收起的播放控制条、播放进度、时间与剩余秒数
+- Apple Music 风格全屏播放器和迷你播放条，支持封面、歌词切换、音质、进度与前后跳转
+- 下载失败详细诊断，记录接口、音质尝试、HTTP 状态、系统错误码和失败阶段
 - 下载到 `Documents/Music/`，默认写入 MP3 ID3 元数据和封面
 - GitHub Actions 在 macOS Runner 上构建未签名 IPA
 
@@ -25,8 +26,8 @@ Actions 工作流位于 `.github/workflows/build.yml`。它使用 macOS Runner�
 
 ## 版本
 
-- Marketing Version: `3.0`
-- Build Number: `23`
+- Marketing Version: `3.1`
+- Build Number: `24`
 
 ## 版本规则
 

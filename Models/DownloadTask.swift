@@ -8,6 +8,82 @@ enum DownloadState: String, Codable, CaseIterable {
     case failed = "下载失败"
 }
 
+struct DownloadAttemptDetail: Codable, Identifiable, Hashable {
+    let id: UUID
+    let encodeType: String
+    let level: String
+    let result: String
+
+    init(encodeType: String, level: String, result: String) {
+        id = UUID()
+        self.encodeType = encodeType
+        self.level = level
+        self.result = result
+    }
+}
+
+struct DownloadFailureDetail: Codable, Identifiable, Hashable {
+    let id: UUID
+    let occurredAt: Date
+    let stage: String
+    let summary: String
+    let songID: Int
+    let selectedQuality: String
+    let loginState: String
+    let errorDomain: String
+    let errorCode: Int
+    let httpStatus: Int?
+    let requestAddress: String?
+    let attempts: [DownloadAttemptDetail]
+
+    init(
+        stage: String,
+        summary: String,
+        songID: Int,
+        selectedQuality: String,
+        loginState: String,
+        errorDomain: String,
+        errorCode: Int,
+        httpStatus: Int? = nil,
+        requestAddress: String? = nil,
+        attempts: [DownloadAttemptDetail] = []
+    ) {
+        id = UUID()
+        occurredAt = Date()
+        self.stage = stage
+        self.summary = summary
+        self.songID = songID
+        self.selectedQuality = selectedQuality
+        self.loginState = loginState
+        self.errorDomain = errorDomain
+        self.errorCode = errorCode
+        self.httpStatus = httpStatus
+        self.requestAddress = requestAddress
+        self.attempts = attempts
+    }
+
+    var reportText: String {
+        var lines = [
+            "下载失败诊断",
+            "时间：\(occurredAt.formatted(date: .numeric, time: .standard))",
+            "阶段：\(stage)",
+            "歌曲 ID：\(songID)",
+            "选择音质：\(selectedQuality)",
+            "登录状态：\(loginState)",
+            "错误域：\(errorDomain)",
+            "错误码：\(errorCode)",
+            "原因：\(summary)"
+        ]
+        if let httpStatus { lines.append("HTTP 状态：\(httpStatus)") }
+        if let requestAddress { lines.append("请求地址：\(requestAddress)") }
+        if !attempts.isEmpty {
+            lines.append("音质尝试：")
+            lines.append(contentsOf: attempts.map { "- \($0.encodeType)/\($0.level)：\($0.result)" })
+        }
+        return lines.joined(separator: "\n")
+    }
+}
+
 struct DownloadTask: Codable, Identifiable, Hashable {
     let id: UUID
     let song: Song
@@ -18,6 +94,7 @@ struct DownloadTask: Codable, Identifiable, Hashable {
     var speedBytesPerSecond: Int64
     var estimatedRemaining: TimeInterval?
     var errorMessage: String?
+    var failureDetail: DownloadFailureDetail? = nil
     var fileURL: URL?
     var resumeData: Data?
 
@@ -40,4 +117,3 @@ enum ByteFormatter {
         return String(format: "%.2f GB", value / 1024 / 1024 / 1024)
     }
 }
-

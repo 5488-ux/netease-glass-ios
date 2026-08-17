@@ -53,6 +53,28 @@ enum NeteaseAPIError: LocalizedError {
         let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         return message.range(of: "[\\u{4E00}-\\u{9FFF}]", options: .regularExpression) != nil ? message : "请求失败，请稍后重试"
     }
+
+    static func diagnosticDescription(for error: Error) -> String {
+        if let error = error as? NeteaseAPIError {
+            switch error {
+            case .invalidURL:
+                return "NeteaseAPIError.invalidURL：网易云请求地址无效"
+            case let .invalidResponse(detail):
+                return "NeteaseAPIError.invalidResponse：\(detail)"
+            case let .httpStatus(status, detail):
+                return "NeteaseAPIError.httpStatus，HTTP \(status)：\(detail)"
+            case let .serverCode(code, detail):
+                return "NeteaseAPIError.serverCode，接口错误码 \(code)：\(detail)"
+            case let .message(value):
+                return "NeteaseAPIError.message：\(value)"
+            case let .downloadUnavailable(value):
+                return "NeteaseAPIError.downloadUnavailable：\(value)"
+            }
+        }
+        let nsError = error as NSError
+        let reason = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(nsError.domain)（\(nsError.code)）：\(reason.isEmpty ? "没有错误说明" : reason)"
+    }
 }
 
 final class NeteaseAPI {
@@ -177,11 +199,23 @@ final class NeteaseAPI {
         try requireLogin()
         let context = "播放歌曲「\(song.name)」ID \(song.id)，\(encodeType)/\(level)"
         // 优先使用专用下载接口：对部分会话返回更稳定的 ymusic CDN 地址
-        if let permission = try? await resolveFromDownloadEndpoint(song: song, level: level, context: context) {
+        var downloadEndpointError: Error?
+        do {
+            let permission = try await resolveFromDownloadEndpoint(song: song, level: level, context: context)
             return permission
+        } catch {
+            downloadEndpointError = error
         }
         // 降级：播放地址接口（处理试听、VIP 提示等）
-        return try await resolveFromPlayerEndpoint(song: song, encodeType: encodeType, level: level, context: context)
+        do {
+            return try await resolveFromPlayerEndpoint(song: song, encodeType: encodeType, level: level, context: context)
+        } catch {
+            let dedicated = downloadEndpointError.map { Self.diagnosticDescription(for: $0) } ?? "没有执行"
+            let player = Self.diagnosticDescription(for: error)
+            throw NeteaseAPIError.downloadUnavailable(
+                "\(context)失败。专用下载接口：\(dedicated)；播放地址接口：\(player)"
+            )
+        }
     }
 
     /// /eapi/song/enhance/download/url/v1 —— 专用下载地址（data 为单个对象）
