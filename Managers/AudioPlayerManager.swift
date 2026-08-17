@@ -71,30 +71,48 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         isPlaying = false
         isLoading = true
 
-        do {
-            let permission = try await api.resolveDownload(for: song)
-            let asset = try await loadPlayableAsset(from: permission)
-            if let loadedDuration = try? await asset.load(.duration) {
-                let seconds = loadedDuration.seconds
-                if seconds.isFinite, seconds > 0 { duration = seconds }
+        // 依次尝试不同编码/音质组合：不同格式会分配到不同 CDN 节点，
+        // 前一种地址被 CDN 拒绝时自动换格式重新获取
+        let attempts: [(encodeType: String, level: String)] = [
+            ("mp3", "standard"),
+            ("aac", "standard"),
+            ("mp3", "exhigh"),
+        ]
+        var lastError: Error?
+        for attempt in attempts {
+            do {
+                let permission = try await api.resolveDownload(for: song, encodeType: attempt.encodeType, level: attempt.level)
+                let asset = try await loadPlayableAsset(from: permission)
+                await startPlayback(with: asset)
+                return
+            } catch {
+                lastError = error
             }
-
-            let item = AVPlayerItem(asset: asset)
-            observe(item)
-            player.replaceCurrentItem(with: item)
-            isLoading = false
-            isPlaying = true
-            player.play()
-        } catch {
-            player.replaceCurrentItem(with: nil)
-            currentSong = nil
-            playingSongID = nil
-            currentTime = 0
-            duration = 0
-            isLoading = false
-            isPlaying = false
-            errorHandler?(NeteaseAPIError.userMessage(for: error))
         }
+        finishPlaybackFailure(lastError ?? NeteaseAPIError.message("播放失败：无法获取可播放的音频"))
+    }
+
+    private func startPlayback(with asset: AVURLAsset) async {
+        if let loadedDuration = try? await asset.load(.duration), loadedDuration.seconds.isFinite, loadedDuration.seconds > 0 {
+            duration = loadedDuration.seconds
+        }
+        let item = AVPlayerItem(asset: asset)
+        observe(item)
+        player.replaceCurrentItem(with: item)
+        isLoading = false
+        isPlaying = true
+        player.play()
+    }
+
+    private func finishPlaybackFailure(_ error: Error) {
+        player.replaceCurrentItem(with: nil)
+        currentSong = nil
+        playingSongID = nil
+        currentTime = 0
+        duration = 0
+        isLoading = false
+        isPlaying = false
+        errorHandler?(NeteaseAPIError.userMessage(for: error))
     }
 
     /// 依次尝试多种组合加载音频资源（原始协议/备用协议、iPhone/桌面 UA、携带 Cookie），

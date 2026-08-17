@@ -153,12 +153,12 @@ final class NeteaseAPI {
         }
     }
 
-    func resolveDownload(for song: Song) async throws -> DownloadPermission {
+    func resolveDownload(for song: Song, encodeType: String = "mp3", level: String = "standard") async throws -> DownloadPermission {
         try requireLogin()
         let requestID = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         let header = "{\"os\":\"pc\",\"appver\":\"\",\"osver\":\"\",\"deviceId\":\"pyncm!\",\"requestId\":\"\(requestID)\"}"
-        let context = "接口 /eapi/song/enhance/player/url/v1（播放歌曲「\(song.name)」ID \(song.id)）"
-        let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": "standard", "encodeType": "mp3", "header": header], context: context)
+        let context = "接口 /eapi/song/enhance/player/url/v1（播放歌曲「\(song.name)」ID \(song.id)，\(encodeType)/\(level)）"
+        let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": level, "encodeType": encodeType, "header": header], context: context)
         guard let item = (json["data"] as? [[String: Any]])?.first else { throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 失败：网易云没有返回播放权限信息") }
         let code = int(item["code"]) ?? -1
         if code == 200, let value = item["url"] as? String, !value.isEmpty, let url = URL(string: value) {

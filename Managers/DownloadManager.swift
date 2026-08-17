@@ -98,26 +98,38 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     private func begin(id: UUID, song: Song, resumeData: Data? = nil) async {
-        do {
-            let permission = try await api.resolveDownload(for: song)
-            var task: URLSessionDownloadTask
-            if let resumeData, !resumeData.isEmpty { task = session.downloadTask(withResumeData: resumeData) }
-            else {
-                var request = URLRequest(url: permission.url)
-                request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
-                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-                if api.hasCookie { request.setValue(api.currentCookie, forHTTPHeaderField: "Cookie") }
-                task = session.downloadTask(with: request)
+        // 依次尝试不同编码/音质组合：不同格式会分配到不同 CDN 节点，
+        // 前一种地址被 CDN 拒绝时自动换格式重新获取
+        let attempts: [(encodeType: String, level: String)] = [
+            ("mp3", "standard"),
+            ("aac", "standard"),
+            ("mp3", "exhigh"),
+        ]
+        var lastError: Error?
+        for attempt in attempts {
+            do {
+                let permission = try await api.resolveDownload(for: song, encodeType: attempt.encodeType, level: attempt.level)
+                var task: URLSessionDownloadTask
+                if let resumeData, !resumeData.isEmpty { task = session.downloadTask(withResumeData: resumeData) }
+                else {
+                    var request = URLRequest(url: permission.url)
+                    request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+                    request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                    if api.hasCookie { request.setValue(api.currentCookie, forHTTPHeaderField: "Cookie") }
+                    task = session.downloadTask(with: request)
+                }
+                activeTasks[task.taskIdentifier] = id
+                update(id: id) { item in item.state = .downloading; item.totalBytes = max(item.totalBytes, permission.totalBytes); item.resumeData = nil }
+                task.resume()
+                return
+            } catch {
+                lastError = error
             }
-            activeTasks[task.taskIdentifier] = id
-            update(id: id) { item in item.state = .downloading; item.totalBytes = max(item.totalBytes, permission.totalBytes); item.resumeData = nil }
-            task.resume()
-        } catch {
-            let message = NeteaseAPIError.userMessage(for: error)
-            update(id: id) { item in item.state = .failed; item.errorMessage = message }
-            errorMessage = message
-            errorHandler?(message)
         }
+        let message = NeteaseAPIError.userMessage(for: lastError ?? NeteaseAPIError.message("下载失败：无法获取下载地址"))
+        update(id: id) { item in item.state = .failed; item.errorMessage = message }
+        errorMessage = message
+        errorHandler?(message)
     }
 
     private func update(id: UUID, _ body: (inout DownloadTask) -> Void) {
