@@ -120,10 +120,12 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     private func loadPlayableAsset(from permission: DownloadPermission) async throws -> AVURLAsset {
         let iphoneUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15"
         let desktopUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36 NeteaseMusicDesktop/3.0.18.203152"
-        let cookie = api.hasCookie ? api.currentCookie : ""
+        var fullCookie = api.hasCookie ? api.currentCookie : ""
+        if !fullCookie.isEmpty { fullCookie += "; " }
+        fullCookie += api.deviceCookie
         func makeOptions(_ ua: String, includeCookie: Bool) -> [String: Any] {
             var headers: [String: String] = ["Referer": "https://music.163.com/", "User-Agent": ua]
-            if includeCookie, !cookie.isEmpty { headers["Cookie"] = cookie }
+            if includeCookie, !fullCookie.isEmpty { headers["Cookie"] = fullCookie }
             return ["AVURLAssetHTTPHeaderFieldsKey": headers]
         }
         var candidates: [(URL, [String: Any])] = []

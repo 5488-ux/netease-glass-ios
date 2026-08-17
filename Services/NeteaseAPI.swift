@@ -61,9 +61,18 @@ final class NeteaseAPI {
     private let interfaceURL = URL(string: "https://interface3.music.163.com")!
     private let interfaceFallbackURL = URL(string: "https://interface.music.163.com")!
     private var cookie: String
+    /// 持久化的真实设备标识：替代第三方标记 "pyncm!"，避免已登录会话被风控
+    private let deviceId: String
 
     init(cookie: String = "") {
         self.cookie = cookie
+        if let saved = UserDefaults.standard.string(forKey: "netease.deviceId"), !saved.isEmpty {
+            deviceId = saved
+        } else {
+            let chars = "0123456789abcdef"
+            deviceId = String((0..<40).map { _ in chars.randomElement()! })
+            UserDefaults.standard.set(deviceId, forKey: "netease.deviceId")
+        }
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 25
         configuration.timeoutIntervalForResource = 90
@@ -75,6 +84,17 @@ final class NeteaseAPI {
     var hasCookie: Bool { !cookie.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     var currentCookie: String { cookie }
     func updateCookie(_ cookie: String) { self.cookie = cookie.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// 设备标识 cookie（与 eapi 请求头一致，模拟官方 PC 客户端）
+    var deviceCookie: String {
+        "os=pc; appver=3.1.17.204416; osver=Microsoft-Windows-10-Professional-build-19045-64bit; deviceId=\(deviceId); channel=netease; versioncode=140; resolution=1920x1080"
+    }
+
+    /// 构造 eapi 请求头（真实设备信息，替代 "pyncm!" 标记）
+    private var deviceIdentityHeader: String {
+        let requestID = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        return "{\"os\":\"pc\",\"appver\":\"3.1.17.204416\",\"osver\":\"Microsoft-Windows-10-Professional-build-19045-64bit\",\"deviceId\":\"\(deviceId)\",\"channel\":\"netease\",\"requestId\":\"\(requestID)\"}"
+    }
 
     func searchSongs(_ keyword: String) async throws -> [Song] {
         try requireLogin()
@@ -155,8 +175,7 @@ final class NeteaseAPI {
 
     func resolveDownload(for song: Song, encodeType: String = "mp3", level: String = "standard") async throws -> DownloadPermission {
         try requireLogin()
-        let requestID = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        let header = "{\"os\":\"pc\",\"appver\":\"\",\"osver\":\"\",\"deviceId\":\"pyncm!\",\"requestId\":\"\(requestID)\"}"
+        let header = deviceIdentityHeader
         let context = "接口 /eapi/song/enhance/player/url/v1（播放歌曲「\(song.name)」ID \(song.id)，\(encodeType)/\(level)）"
         let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": level, "encodeType": encodeType, "header": header], context: context)
         guard let item = (json["data"] as? [[String: Any]])?.first else { throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 失败：网易云没有返回播放权限信息") }
@@ -206,10 +225,10 @@ final class NeteaseAPI {
         let form = try NeteaseCipher.encryptEAPI(path: path, payload: payload)
         let baseContext = context ?? "接口 \(path)"
         do {
-            return try await requestJSON(url: interfaceURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: baseContext)
+            return try await requestJSON(url: interfaceURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: baseContext, extraCookie: deviceCookie)
         } catch let error as URLError where error.code != .cancelled {
             // interface3.music.163.com 在某些网络环境下连接异常，回退到 interface.music.163.com 重试一次
-            return try await requestJSON(url: interfaceFallbackURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: baseContext + "（已切换备用服务器 interface.music.163.com）")
+            return try await requestJSON(url: interfaceFallbackURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: baseContext + "（已切换备用服务器 interface.music.163.com）", extraCookie: deviceCookie)
         } catch {
             // 服务器拒绝（-1102 等）或请求已取消时不自动重试，避免掩盖真实原因
             throw error
@@ -231,8 +250,8 @@ final class NeteaseAPI {
     private func requireLogin() throws { if !hasCookie { throw NeteaseAPIError.message("请先登录网易云音乐") } }
     private var csrfToken: String { cookie.split(separator: ";").compactMap { part in let p = part.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "=", maxSplits: 1); return p.count == 2 && p[0] == "__csrf" ? String(p[1]) : nil }.first ?? "" }
 
-    private func requestJSON(url: URL, method: String, body: Data?, contentType: String?, context: String = "") async throws -> [String: Any] {
-        let result = try await requestJSONWithResponse(url: url, method: method, body: body, contentType: contentType, context: context)
+    private func requestJSON(url: URL, method: String, body: Data?, contentType: String?, context: String = "", extraCookie: String = "") async throws -> [String: Any] {
+        let result = try await requestJSONWithResponse(url: url, method: method, body: body, contentType: contentType, context: context, extraCookie: extraCookie)
         return result.0
     }
 
@@ -257,7 +276,7 @@ final class NeteaseAPI {
         return parts.joined(separator: "；")
     }
 
-    private func requestJSONWithResponse(url: URL, method: String, body: Data?, contentType: String?, context: String = "", toleratedCodes: Set<Int> = []) async throws -> ([String: Any], HTTPURLResponse) {
+    private func requestJSONWithResponse(url: URL, method: String, body: Data?, contentType: String?, context: String = "", toleratedCodes: Set<Int> = [], extraCookie: String = "") async throws -> ([String: Any], HTTPURLResponse) {
         var request = URLRequest(url: url)
         request.httpMethod = method; request.httpBody = body; request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue(Self.desktopUserAgent, forHTTPHeaderField: "User-Agent")
@@ -265,7 +284,11 @@ final class NeteaseAPI {
         request.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
-        if hasCookie { request.setValue(cookie, forHTTPHeaderField: "Cookie") }
+        if hasCookie {
+            request.setValue(extraCookie.isEmpty ? cookie : cookie + "; " + extraCookie, forHTTPHeaderField: "Cookie")
+        } else if !extraCookie.isEmpty {
+            request.setValue(extraCookie, forHTTPHeaderField: "Cookie")
+        }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NeteaseAPIError.invalidResponse("网易云没有返回有效响应\(context.isEmpty ? "" : "（\(context)）")") }
         let json = try decodeJSON(data)
