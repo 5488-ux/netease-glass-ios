@@ -26,6 +26,15 @@ enum NeteaseAPIError: LocalizedError {
         }
     }
 
+    /// 会话失效类错误（登录过期或需要重新登录），用于触发重新扫码登录。
+    var isSessionExpired: Bool {
+        switch self {
+        case .serverCode(let code, _): return code == -1102 || code == 1102
+        case .message(let value): return value.contains("登录状态已失效")
+        default: return false
+        }
+    }
+
     static func userMessage(for error: Error) -> String {
         if let error = error as? NeteaseAPIError { return error.errorDescription ?? "网易云请求失败" }
         if let error = error as? URLError {
@@ -125,7 +134,7 @@ final class NeteaseAPI {
         components.queryItems = [URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]
         guard let url = components.url else { throw NeteaseAPIError.invalidURL }
         let body = "key=\(session.key.formURLEncoded)&type=3".data(using: .utf8)
-        let (json, response) = try await requestJSONWithResponse(url: url, method: "POST", body: body, contentType: "application/x-www-form-urlencoded")
+        let (json, response) = try await requestJSONWithResponse(url: url, method: "POST", body: body, contentType: "application/x-www-form-urlencoded", toleratedCodes: [800, 801, 802, 803])
         guard let code = int(json["code"]) else { throw NeteaseAPIError.invalidResponse("二维码登录状态无法识别") }
         switch code {
         case 801: return .waiting
@@ -149,6 +158,9 @@ final class NeteaseAPI {
         let code = int(item["code"]) ?? -1
         if code == 200, let value = item["url"] as? String, !value.isEmpty, let url = secureURL(value) {
             return DownloadPermission(url: url, totalBytes: int64(item["size"]) ?? 0, bitrate: int(item["br"]))
+        }
+        if code == -1102 || code == 1102 {
+            throw NeteaseAPIError.message("登录状态已失效，请到「设置」中重新扫码登录")
         }
         let fee = int(item["fee"]) ?? song.fee
         let reason = (item["freeTrialPrivilege"] as? [String: Any])?["cannotListenReason"] as? String
@@ -204,7 +216,7 @@ final class NeteaseAPI {
         return result.0
     }
 
-    private func requestJSONWithResponse(url: URL, method: String, body: Data?, contentType: String?) async throws -> ([String: Any], HTTPURLResponse) {
+    private func requestJSONWithResponse(url: URL, method: String, body: Data?, contentType: String?, toleratedCodes: Set<Int> = []) async throws -> ([String: Any], HTTPURLResponse) {
         var request = URLRequest(url: url)
         request.httpMethod = method; request.httpBody = body; request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue(Self.desktopUserAgent, forHTTPHeaderField: "User-Agent")
@@ -217,7 +229,13 @@ final class NeteaseAPI {
         guard let http = response as? HTTPURLResponse else { throw NeteaseAPIError.invalidResponse("网易云没有返回有效响应") }
         let json = try decodeJSON(data)
         guard (200..<300).contains(http.statusCode) else { throw NeteaseAPIError.httpStatus(http.statusCode, serverMessage(from: json, fallback: "网易云服务返回 HTTP \(http.statusCode)")) }
-        if let code = int(json["code"]), code != 200 { throw NeteaseAPIError.serverCode(code, serverMessage(from: json, fallback: "网易云接口返回错误（\(code)）")) }
+        if let code = int(json["code"]), code != 200, !toleratedCodes.contains(code) {
+            // -1102/1102：登录会话已失效，网易云要求重新登录后才能继续请求
+            if code == -1102 || code == 1102 {
+                throw NeteaseAPIError.message("登录状态已失效，请到「设置」中重新扫码登录")
+            }
+            throw NeteaseAPIError.serverCode(code, serverMessage(from: json, fallback: "网易云接口返回错误（\(code)）"))
+        }
         return (json, http)
     }
 

@@ -27,7 +27,13 @@ final class LoginManager: ObservableObject {
             account = try await api.account()
             errorMessage = nil
         } catch {
-            errorMessage = NeteaseAPIError.userMessage(for: error)
+            if let apiError = error as? NeteaseAPIError, apiError.isSessionExpired {
+                // 会话已失效：清除过期凭证，提示用户重新扫码登录
+                logout()
+                errorMessage = "登录状态已失效，请重新扫码登录"
+            } else {
+                errorMessage = NeteaseAPIError.userMessage(for: error)
+            }
         }
     }
 

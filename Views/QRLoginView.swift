@@ -102,8 +102,19 @@ struct QRLoginView: View {
                     if newStatus == .expired || newStatus == .failed { return }
                 } catch is CancellationError {
                     return
+                } catch let error as URLError {
+                    switch error.code {
+                    case .cancelled:
+                        return
+                    case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
+                        errorMessage = "网络暂时中断，回到本应用后会继续检查登录状态"
+                    default:
+                        errorMessage = "网络请求失败，请稍后重试"
+                    }
                 } catch {
-                    errorMessage = "网络暂时中断，回到本应用后会继续检查登录状态"
+                    errorMessage = NeteaseAPIError.userMessage(for: error)
+                    status = .failed
+                    return
                 }
             }
         }
