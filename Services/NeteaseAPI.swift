@@ -161,7 +161,9 @@ final class NeteaseAPI {
         let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": "standard", "encodeType": "mp3", "header": header], context: context)
         guard let item = (json["data"] as? [[String: Any]])?.first else { throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 失败：网易云没有返回播放权限信息") }
         let code = int(item["code"]) ?? -1
-        if code == 200, let value = item["url"] as? String, !value.isEmpty, let url = secureURL(value) {
+        if code == 200, let value = item["url"] as? String, !value.isEmpty, let url = URL(string: value) {
+            // 使用服务器返回的原始地址（不强制改为 https）：签名 URL 可能与协议绑定，
+            // 强行替换协议会导致 CDN 返回 403
             return DownloadPermission(url: url, totalBytes: int64(item["size"]) ?? 0, bitrate: int(item["br"]))
         }
         let itemText = [item["message"] as? String, item["msg"] as? String, (item["freeTrialPrivilege"] as? [String: Any])?["cannotListenReason"] as? String]

@@ -97,20 +97,29 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         }
     }
 
-    /// 依次尝试多种组合加载音频资源（https/http、iPhone/桌面 UA），
+    /// 依次尝试多种组合加载音频资源（原始协议/备用协议、iPhone/桌面 UA、携带 Cookie），
     /// 全部失败时抛出带详细信息的错误，便于定位真实原因。
     private func loadPlayableAsset(from permission: DownloadPermission) async throws -> AVURLAsset {
         let iphoneUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15"
         let desktopUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36 NeteaseMusicDesktop/3.0.18.203152"
-        func makeOptions(_ ua: String) -> [String: Any] {
-            ["AVURLAssetHTTPHeaderFieldsKey": ["Referer": "https://music.163.com/", "User-Agent": ua]]
+        let cookie = api.hasCookie ? api.currentCookie : ""
+        func makeOptions(_ ua: String, includeCookie: Bool) -> [String: Any] {
+            var headers: [String: String] = ["Referer": "https://music.163.com/", "User-Agent": ua]
+            if includeCookie, !cookie.isEmpty { headers["Cookie"] = cookie }
+            return ["AVURLAssetHTTPHeaderFieldsKey": headers]
         }
-        var candidates: [(URL, [String: Any])] = [(permission.url, makeOptions(iphoneUA))]
-        if var components = URLComponents(url: permission.url, resolvingAgainstBaseURL: false), components.scheme == "https" {
-            components.scheme = "http"
-            if let httpURL = components.url { candidates.append((httpURL, makeOptions(iphoneUA))) }
+        var candidates: [(URL, [String: Any])] = []
+        func addCandidate(_ url: URL, _ ua: String) {
+            candidates.append((url, makeOptions(ua, includeCookie: true)))
+            candidates.append((url, makeOptions(ua, includeCookie: false)))
         }
-        candidates.append((permission.url, makeOptions(desktopUA)))
+        addCandidate(permission.url, iphoneUA)
+        addCandidate(permission.url, desktopUA)
+        if var components = URLComponents(url: permission.url, resolvingAgainstBaseURL: false) {
+            let originalScheme = components.scheme
+            components.scheme = originalScheme == "https" ? "http" : "https"
+            if let alternate = components.url { addCandidate(alternate, iphoneUA) }
+        }
 
         var lastError: Error?
         for (url, options) in candidates {

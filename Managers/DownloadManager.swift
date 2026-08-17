@@ -106,6 +106,7 @@ final class DownloadManager: NSObject, ObservableObject {
                 var request = URLRequest(url: permission.url)
                 request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
                 request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                if api.hasCookie { request.setValue(api.currentCookie, forHTTPHeaderField: "Cookie") }
                 task = session.downloadTask(with: request)
             }
             activeTasks[task.taskIdentifier] = id
