@@ -121,7 +121,7 @@ final class NeteaseAPI {
         var components = URLComponents(url: URL(string: "https://interface.music.163.com/api/login/qrcode/unikey")!, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "type", value: "3"), URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]
         guard let url = components.url else { throw NeteaseAPIError.invalidURL }
-        let json = try await requestJSON(url: url, method: "GET", body: nil, contentType: nil)
+        let json = try await requestJSON(url: url, method: "GET", body: nil, contentType: nil, context: "生成登录二维码")
         guard let key = json["unikey"] as? String, let loginURL = URL(string: "https://music.163.com/login?codekey=\(key.formURLEncoded)") else {
             throw NeteaseAPIError.message("二维码生成失败，请刷新后重试")
         }
@@ -134,7 +134,7 @@ final class NeteaseAPI {
         components.queryItems = [URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]
         guard let url = components.url else { throw NeteaseAPIError.invalidURL }
         let body = "key=\(session.key.formURLEncoded)&type=3".data(using: .utf8)
-        let (json, response) = try await requestJSONWithResponse(url: url, method: "POST", body: body, contentType: "application/x-www-form-urlencoded", toleratedCodes: [800, 801, 802, 803])
+        let (json, response) = try await requestJSONWithResponse(url: url, method: "POST", body: body, contentType: "application/x-www-form-urlencoded", context: "查询扫码状态", toleratedCodes: [800, 801, 802, 803])
         guard let code = int(json["code"]) else { throw NeteaseAPIError.invalidResponse("二维码登录状态无法识别") }
         switch code {
         case 801: return .waiting
@@ -145,7 +145,7 @@ final class NeteaseAPI {
             guard !merged.isEmpty else { throw NeteaseAPIError.message("扫码已确认，但网易云没有返回登录凭据，请刷新二维码重试") }
             cookie = merged
             return .success
-        default: throw NeteaseAPIError.serverCode(code, serverMessage(from: json, fallback: "二维码登录被网易云拒绝"))
+        default: throw NeteaseAPIError.serverCode(code, serverMessage(from: json, fallback: "二维码登录被网易云拒绝（\(code)）"))
         }
     }
 
@@ -153,19 +153,24 @@ final class NeteaseAPI {
         try requireLogin()
         let requestID = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         let header = "{\"os\":\"pc\",\"appver\":\"\",\"osver\":\"\",\"deviceId\":\"pyncm!\",\"requestId\":\"\(requestID)\"}"
-        let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": "standard", "encodeType": "mp3", "header": header])
-        guard let item = (json["data"] as? [[String: Any]])?.first else { throw NeteaseAPIError.downloadUnavailable("网易云没有返回该歌曲的下载权限信息") }
+        let context = "接口 /eapi/song/enhance/player/url/v1（播放歌曲「\(song.name)」ID \(song.id)）"
+        let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": "standard", "encodeType": "mp3", "header": header], context: context)
+        guard let item = (json["data"] as? [[String: Any]])?.first else { throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 失败：网易云没有返回播放权限信息") }
         let code = int(item["code"]) ?? -1
         if code == 200, let value = item["url"] as? String, !value.isEmpty, let url = secureURL(value) {
             return DownloadPermission(url: url, totalBytes: int64(item["size"]) ?? 0, bitrate: int(item["br"]))
         }
+        let itemText = [item["message"] as? String, item["msg"] as? String, (item["freeTrialPrivilege"] as? [String: Any])?["cannotListenReason"] as? String]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? ""
+        let base = "播放歌曲「\(song.name)」(ID \(song.id)) 失败：网易云返回错误码 \(code)"
+        let detail = base + (itemText.isEmpty ? "" : "（服务器消息：\(itemText)）") + "；登录状态：\(cookieStatusDescription)"
         if code == -1102 || code == 1102 {
-            throw NeteaseAPIError.message("登录状态已失效，请到「设置」中重新扫码登录")
+            throw NeteaseAPIError.message(detail + "；该错误通常表示登录状态已失效，可到「设置」中重新扫码登录后重试")
         }
         let fee = int(item["fee"]) ?? song.fee
-        let reason = (item["freeTrialPrivilege"] as? [String: Any])?["cannotListenReason"] as? String
-        if fee == 1 || fee == 4 || fee == 8 || code == -110 { throw NeteaseAPIError.downloadUnavailable(reason ?? "该歌曲需要 VIP 或当前账号没有下载权限") }
-        throw NeteaseAPIError.downloadUnavailable(reason ?? "网易云未授予下载地址，可能受版权、地区或账号权限限制")
+        if fee == 1 || fee == 4 || fee == 8 || code == -110 { throw NeteaseAPIError.downloadUnavailable(detail + "；该歌曲需要 VIP 或当前账号没有播放/下载权限") }
+        throw NeteaseAPIError.downloadUnavailable(detail + "；可能受版权、地区或账号权限限制")
     }
 
     func imageData(url: URL?) async -> Data? {
@@ -183,17 +188,17 @@ final class NeteaseAPI {
     private func cloudSearch(_ keyword: String, type: Int, limit: Int) async throws -> [String: Any] {
         let payload: [String: Any] = ["method": "POST", "url": "https://music.163.com/api/cloudsearch/pc", "params": ["s": keyword, "type": type, "offset": 0, "limit": limit]]
         let eparams = try NeteaseCipher.encryptLinux(payload)
-        return try await requestJSON(url: musicURL.appending(path: "/api/linux/forward"), method: "POST", body: "eparams=\(eparams.formURLEncoded)".data(using: .utf8), contentType: "application/x-www-form-urlencoded")
+        return try await requestJSON(url: musicURL.appending(path: "/api/linux/forward"), method: "POST", body: "eparams=\(eparams.formURLEncoded)".data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: "搜索接口 /api/linux/forward")
     }
 
-    private func weAPI(path: String, payload: [String: Any]) async throws -> [String: Any] {
+    private func weAPI(path: String, payload: [String: Any], context: String? = nil) async throws -> [String: Any] {
         let form = try NeteaseCipher.encryptWeAPI(payload)
-        return try await requestJSON(url: musicURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded")
+        return try await requestJSON(url: musicURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: context ?? "接口 \(path)")
     }
 
-    private func eAPI(path: String, payload: [String: Any]) async throws -> [String: Any] {
+    private func eAPI(path: String, payload: [String: Any], context: String? = nil) async throws -> [String: Any] {
         let form = try NeteaseCipher.encryptEAPI(path: path, payload: payload)
-        return try await requestJSON(url: interfaceURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded")
+        return try await requestJSON(url: interfaceURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: context ?? "接口 \(path)")
     }
 
     private func fetchSongs(ids: [Int]) async throws -> [Song] {
@@ -211,12 +216,33 @@ final class NeteaseAPI {
     private func requireLogin() throws { if !hasCookie { throw NeteaseAPIError.message("请先登录网易云音乐") } }
     private var csrfToken: String { cookie.split(separator: ";").compactMap { part in let p = part.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "=", maxSplits: 1); return p.count == 2 && p[0] == "__csrf" ? String(p[1]) : nil }.first ?? "" }
 
-    private func requestJSON(url: URL, method: String, body: Data?, contentType: String?) async throws -> [String: Any] {
-        let result = try await requestJSONWithResponse(url: url, method: method, body: body, contentType: contentType)
+    private func requestJSON(url: URL, method: String, body: Data?, contentType: String?, context: String = "") async throws -> [String: Any] {
+        let result = try await requestJSONWithResponse(url: url, method: method, body: body, contentType: contentType, context: context)
         return result.0
     }
 
-    private func requestJSONWithResponse(url: URL, method: String, body: Data?, contentType: String?, toleratedCodes: Set<Int> = []) async throws -> ([String: Any], HTTPURLResponse) {
+    /// 当前登录凭证状态的简要描述，用于错误诊断。
+    private var cookieStatusDescription: String {
+        guard hasCookie else { return "未登录（无已保存凭证）" }
+        let names = cookie.split(separator: ";").compactMap { part in part.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "=", maxSplits: 1).first.map(String.init) }
+        if names.contains("MUSIC_U") { return "已保存登录凭证（包含 MUSIC_U，共 \(names.count) 个字段）" }
+        return "已保存登录凭证（⚠️ 不含 MUSIC_U，仅字段：\(names.joined(separator: "、"))）"
+    }
+
+    /// 拼装带上下文的详细错误文本（包含服务器原始返回，便于定位真实原因）。
+    private func rejectedMessage(code: Int, serverText: String, context: String, json: [String: Any]) -> String {
+        var parts: [String] = ["网易云接口返回错误（\(code)）"]
+        if !context.isEmpty { parts.append(context) }
+        if !serverText.isEmpty { parts.append("服务器消息：\(serverText)") }
+        parts.append("登录状态：\(cookieStatusDescription)")
+        if let data = try? JSONSerialization.data(withJSONObject: json), let text = String(data: data, encoding: .utf8), !text.isEmpty {
+            let snippet = text.count > 240 ? String(text.prefix(240)) + "…" : text
+            parts.append("服务器返回：\(snippet)")
+        }
+        return parts.joined(separator: "；")
+    }
+
+    private func requestJSONWithResponse(url: URL, method: String, body: Data?, contentType: String?, context: String = "", toleratedCodes: Set<Int> = []) async throws -> ([String: Any], HTTPURLResponse) {
         var request = URLRequest(url: url)
         request.httpMethod = method; request.httpBody = body; request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue(Self.desktopUserAgent, forHTTPHeaderField: "User-Agent")
@@ -226,15 +252,19 @@ final class NeteaseAPI {
         if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
         if hasCookie { request.setValue(cookie, forHTTPHeaderField: "Cookie") }
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw NeteaseAPIError.invalidResponse("网易云没有返回有效响应") }
+        guard let http = response as? HTTPURLResponse else { throw NeteaseAPIError.invalidResponse("网易云没有返回有效响应\(context.isEmpty ? "" : "（\(context)）")") }
         let json = try decodeJSON(data)
-        guard (200..<300).contains(http.statusCode) else { throw NeteaseAPIError.httpStatus(http.statusCode, serverMessage(from: json, fallback: "网易云服务返回 HTTP \(http.statusCode)")) }
+        guard (200..<300).contains(http.statusCode) else {
+            let serverText = serverMessage(from: json, fallback: "")
+            throw NeteaseAPIError.httpStatus(http.statusCode, "HTTP \(http.statusCode)\(context.isEmpty ? "" : "（\(context)）")\(serverText.isEmpty ? "" : "：\(serverText)")")
+        }
         if let code = int(json["code"]), code != 200, !toleratedCodes.contains(code) {
-            // -1102/1102：登录会话已失效，网易云要求重新登录后才能继续请求
+            let detail = rejectedMessage(code: code, serverText: serverMessage(from: json, fallback: ""), context: context, json: json)
             if code == -1102 || code == 1102 {
-                throw NeteaseAPIError.message("登录状态已失效，请到「设置」中重新扫码登录")
+                // 附上服务器原文，避免掩盖真实原因；该码通常表示登录状态已失效
+                throw NeteaseAPIError.serverCode(code, detail + "；该错误通常表示登录状态已失效，可到「设置」中重新扫码登录后重试")
             }
-            throw NeteaseAPIError.serverCode(code, serverMessage(from: json, fallback: "网易云接口返回错误（\(code)）"))
+            throw NeteaseAPIError.serverCode(code, detail)
         }
         return (json, http)
     }
@@ -248,8 +278,10 @@ final class NeteaseAPI {
     }
 
     private func serverMessage(from json: [String: Any], fallback: String) -> String {
-        let messages = ["message", "msg", "reason"].compactMap { (json[$0] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }
-        return messages.first(where: { !$0.isEmpty && $0.range(of: "[\\u{4E00}-\\u{9FFF}]", options: .regularExpression) != nil }) ?? fallback
+        let messages = ["message", "msg", "reason"].compactMap { (json[$0] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        if let chinese = messages.first(where: { $0.range(of: "[\\u{4E00}-\\u{9FFF}]", options: .regularExpression) != nil }) { return chinese }
+        if let first = messages.first { return first }
+        return fallback
     }
     private func jsonString(_ value: Any) throws -> String { guard let result = String(data: try JSONSerialization.data(withJSONObject: value), encoding: .utf8) else { throw NeteaseAPIError.message("请求参数编码失败") }; return result }
     private func int(_ value: Any?) -> Int? { if let v = value as? Int { return v }; if let v = value as? Int64 { return Int(v) }; if let v = value as? NSNumber { return v.intValue }; if let v = value as? String { return Int(v) }; return nil }

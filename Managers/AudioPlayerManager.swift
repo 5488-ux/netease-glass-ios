@@ -152,7 +152,8 @@ final class AudioPlayerManager: NSObject, ObservableObject {
                 if item.status == .failed {
                     self.isPlaying = false
                     self.isLoading = false
-                    self.errorHandler?("音频播放失败，请重新选择歌曲")
+                    let detail = item.error?.localizedDescription ?? ""
+                    self.errorHandler?(detail.isEmpty ? "音频播放失败，请重新选择歌曲" : "音频播放失败：\(detail)")
                 }
             }
         }
