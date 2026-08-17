@@ -263,7 +263,11 @@ struct HomeView: View {
         )
         mode = .song
         songs = [previewSong]
-        app.likeManager.prepareLayoutPreview(songID: previewSong.id, liked: true)
+        Task { @MainActor in
+            // 等 AppModel 的初始未登录状态刷新结束，再固定为“已喜欢”用于截图验收。
+            try? await Task.sleep(for: .milliseconds(500))
+            app.likeManager.prepareLayoutPreview(songID: previewSong.id, liked: true)
+        }
 #endif
     }
 
