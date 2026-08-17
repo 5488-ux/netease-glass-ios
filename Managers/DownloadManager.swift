@@ -98,13 +98,10 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     private func begin(id: UUID, song: Song, resumeData: Data? = nil) async {
-        // 依次尝试不同编码/音质组合：不同格式会分配到不同 CDN 节点，
+        // 按用户选择的音质依次尝试：不同格式会分配到不同 CDN 节点，
         // 前一种地址被 CDN 拒绝时自动换格式重新获取
-        let attempts: [(encodeType: String, level: String)] = [
-            ("mp3", "standard"),
-            ("aac", "standard"),
-            ("mp3", "exhigh"),
-        ]
+        let preferred = UserDefaults.standard.string(forKey: "player.quality") ?? AudioQuality.standard.rawValue
+        let attempts = AudioQuality.attempts(for: preferred)
         var lastError: Error?
         for attempt in attempts {
             do {

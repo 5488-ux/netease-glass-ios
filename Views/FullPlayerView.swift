@@ -1,12 +1,13 @@
 import SwiftUI
+import UIKit
 
-/// 全屏播放器（Apple Music 风格）：大封面、滚动歌词、进度与控制
+/// 全屏播放器（Apple Music 风格）：
+/// 页面整体固定不滚动；封面模糊背景；歌词区域独立滚动并高亮跟随；支持音质选择
 struct FullPlayerView: View {
     @EnvironmentObject private var app: AppModel
-    @Environment(\.dismiss) private var dismiss
-
     @State private var lyrics: [LyricLine] = []
     @State private var lyricsLoading = false
+    @State private var artworkImage: UIImage?
 
     private var player: AudioPlayerManager { app.audioPlayer }
 
@@ -14,48 +15,48 @@ struct FullPlayerView: View {
         ZStack {
             backgroundLayer
 
-            if let song = player.currentSong {
-                VStack(spacing: 0) {
-                    topBar
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 0) {
-                            artwork(song)
-                            songInfo(song)
-                            lyricSection
-                            progressSection
-                            controlsSection
-                                .padding(.top, 14)
-                                .padding(.bottom, 36)
-                        }
-                    }
-                }
-                .foregroundStyle(.white)
-                .task(id: player.currentSong?.id) { await loadLyrics() }
+            VStack(spacing: 0) {
+                topBar
+                artwork
+                songInfo
+                lyricSection
+                progressSection
+                controlsSection
+                    .padding(.top, 6)
+                    .padding(.bottom, 26)
             }
+            .foregroundStyle(.white)
+        }
+        .task(id: player.currentSong?.id) {
+            await loadArtwork()
+            await loadLyrics()
         }
     }
 
-    // MARK: - 背景（暗色渐变 + 光斑，Apple Music 风格）
+    // MARK: - 背景（封面模糊 + 暗色，iOS 26 Apple Music 风格）
 
     private var backgroundLayer: some View {
         ZStack {
-            Color(red: 0.09, green: 0.10, blue: 0.17)
-            Circle()
-                .fill(AppPalette.violet.opacity(0.45))
-                .frame(width: 340, height: 340)
-                .blur(radius: 60)
-                .offset(x: 170, y: -320)
-            Circle()
-                .fill(AppPalette.blue.opacity(0.35))
-                .frame(width: 300, height: 300)
-                .blur(radius: 55)
-                .offset(x: -180, y: 340)
+            if let artworkImage {
+                Image(uiImage: artworkImage)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 62)
+                    .scaleEffect(1.9)
+                    .opacity(0.55)
+            } else {
+                LinearGradient(
+                    colors: [Color(red: 0.13, green: 0.14, blue: 0.21), Color(red: 0.05, green: 0.06, blue: 0.10)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            Color.black.opacity(0.32)
         }
         .ignoresSafeArea()
     }
 
-    // MARK: - 顶栏
+    // MARK: - 顶栏（收起按钮 + 标题 + 音质选择）
 
     private var topBar: some View {
         HStack {
@@ -77,88 +78,115 @@ struct FullPlayerView: View {
 
             Spacer()
 
-            Color.clear.frame(width: 44, height: 44)
+            qualityMenu
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
+        .padding(.horizontal, 14)
+        .padding(.top, 4)
+    }
+
+    private var qualityMenu: some View {
+        Menu {
+            ForEach(AudioQuality.allCases) { quality in
+                Button {
+                    player.setPreferredLevel(quality.rawValue)
+                } label: {
+                    if player.preferredLevel == quality.rawValue {
+                        Label(quality.title, systemImage: "checkmark")
+                    } else {
+                        Text(quality.title)
+                    }
+                }
+            }
+        } label: {
+            Text(player.preferredLevelTitle)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(.white.opacity(0.16), in: Capsule())
+        }
+        .accessibilityLabel("选择音质")
     }
 
     // MARK: - 封面
 
-    private func artwork(_ song: Song) -> some View {
-        RemoteImage(url: song.coverURL, size: 262)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
-            .padding(.top, 26)
-            .padding(.horizontal, 24)
+    private var artwork: some View {
+        Group {
+            if let song = player.currentSong {
+                RemoteImage(url: song.coverURL, size: 224)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .shadow(color: .black.opacity(0.45), radius: 20, y: 10)
+            }
+        }
+        .padding(.top, 16)
     }
 
     // MARK: - 歌曲信息
 
-    private func songInfo(_ song: Song) -> some View {
-        VStack(spacing: 6) {
-            Text(song.name)
-                .font(.title2.bold())
-                .lineLimit(1)
-            Text(song.artist)
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.65))
-                .lineLimit(1)
+    private var songInfo: some View {
+        VStack(spacing: 5) {
+            if let song = player.currentSong {
+                Text(song.name)
+                    .font(.title2.bold())
+                    .lineLimit(1)
+                Text(song.artist)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.65))
+                    .lineLimit(1)
+            }
         }
-        .padding(.top, 20)
+        .padding(.top, 14)
         .padding(.horizontal, 24)
     }
 
-    // MARK: - 歌词
+    // MARK: - 歌词（独立滚动、高亮、自动跟随播放进度）
 
     private var lyricSection: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 13) {
+                LazyVStack(spacing: 15) {
                     if lyricsLoading {
                         ProgressView().tint(.white)
-                            .padding(.top, 46)
+                            .padding(.top, 42)
                     } else if lyrics.isEmpty {
                         Text("暂无歌词")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.45))
-                            .padding(.top, 46)
+                            .padding(.top, 42)
                     } else {
                         ForEach(Array(lyrics.enumerated()), id: \.element.id) { index, line in
                             Text(line.text)
                                 .font(index == currentLyricIndex ? .subheadline.weight(.semibold) : .subheadline)
-                                .foregroundStyle(index == currentLyricIndex ? .white : .white.opacity(0.45))
+                                .foregroundStyle(index == currentLyricIndex ? .white : .white.opacity(0.42))
                                 .multilineTextAlignment(.center)
                                 .id(index)
                                 .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 26)
                         }
                     }
                 }
-                .padding(.vertical, 18)
-                .padding(.horizontal, 22)
+                .padding(.vertical, 8)
             }
-            .frame(height: 268)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: currentLyricIndex) { _, index in
                 guard let index else { return }
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(.easeInOut(duration: 0.35)) {
                     proxy.scrollTo(index, anchor: .center)
                 }
             }
         }
-        .padding(.top, 14)
+        .padding(.top, 6)
     }
 
     private var currentLyricIndex: Int? {
         guard !lyrics.isEmpty else { return nil }
         let time = player.currentTime
-        let index = lyrics.lastIndex { $0.time <= time } ?? 0
-        return index
+        return lyrics.lastIndex { $0.time <= time } ?? 0
     }
 
     // MARK: - 进度
 
     private var progressSection: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             Slider(
                 value: Binding(
                     get: { player.currentTime },
@@ -177,7 +205,7 @@ struct FullPlayerView: View {
             .foregroundStyle(.white.opacity(0.6))
         }
         .padding(.horizontal, 26)
-        .padding(.top, 6)
+        .padding(.top, 2)
     }
 
     // MARK: - 控制
@@ -216,6 +244,19 @@ struct FullPlayerView: View {
     }
 
     // MARK: - 数据
+
+    private func loadArtwork() async {
+        guard let url = player.currentSong?.coverURL else {
+            artworkImage = nil
+            return
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://music.163.com/", forHTTPHeaderField: "Referer")
+        if let (data, _) = try? await URLSession.shared.data(for: request), let image = UIImage(data: data) {
+            artworkImage = image
+        }
+    }
 
     private func loadLyrics() async {
         guard let song = player.currentSong else {

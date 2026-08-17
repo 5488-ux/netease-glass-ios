@@ -2,6 +2,39 @@ import AVFoundation
 import Combine
 import Foundation
 
+/// 音质档位（对应网易云 level 参数）
+enum AudioQuality: String, CaseIterable, Identifiable {
+    case standard = "standard"
+    case exhigh = "exhigh"
+    case lossless = "lossless"
+    case hires = "hires"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .standard: return "标准音质"
+        case .exhigh: return "高品音质"
+        case .lossless: return "无损音质"
+        case .hires: return "Hi-Res"
+        }
+    }
+
+    /// 该音质下依次尝试的（编码, 音质档）组合，前面的失败自动降级到后面的
+    static func attempts(for level: String) -> [(encodeType: String, level: String)] {
+        switch level {
+        case AudioQuality.hires.rawValue:
+            return [("flac", "hires"), ("flac", "lossless"), ("mp3", "exhigh"), ("mp3", "standard")]
+        case AudioQuality.lossless.rawValue:
+            return [("flac", "lossless"), ("mp3", "exhigh"), ("mp3", "standard")]
+        case AudioQuality.exhigh.rawValue:
+            return [("mp3", "exhigh"), ("mp3", "standard"), ("aac", "standard")]
+        default:
+            return [("mp3", "standard"), ("aac", "standard"), ("mp3", "exhigh")]
+        }
+    }
+}
+
 @MainActor
 final class AudioPlayerManager: NSObject, ObservableObject {
     @Published private(set) var currentSong: Song?
@@ -10,6 +43,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
+    @Published private(set) var preferredLevel: String
 
     var errorHandler: ((String) -> Void)?
 
@@ -21,10 +55,25 @@ final class AudioPlayerManager: NSObject, ObservableObject {
 
     init(api: NeteaseAPI) {
         self.api = api
+        self.preferredLevel = UserDefaults.standard.string(forKey: "player.quality") ?? AudioQuality.standard.rawValue
         super.init()
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP])
         try? AVAudioSession.sharedInstance().setActive(true)
         installObservers()
+    }
+
+    var preferredLevelTitle: String {
+        AudioQuality(rawValue: preferredLevel)?.title ?? AudioQuality.standard.title
+    }
+
+    /// 切换音质：保存偏好，并立即用新音质重新加载当前歌曲
+    func setPreferredLevel(_ level: String) {
+        guard AudioQuality(rawValue: level) != nil else { return }
+        preferredLevel = level
+        UserDefaults.standard.set(level, forKey: "player.quality")
+        if let song = currentSong {
+            Task { await play(song: song) }
+        }
     }
 
     deinit {
@@ -71,13 +120,9 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         isPlaying = false
         isLoading = true
 
-        // 依次尝试不同编码/音质组合：不同格式会分配到不同 CDN 节点，
-        // 前一种地址被 CDN 拒绝时自动换格式重新获取
-        let attempts: [(encodeType: String, level: String)] = [
-            ("mp3", "standard"),
-            ("aac", "standard"),
-            ("mp3", "exhigh"),
-        ]
+        // 按用户选择的音质依次尝试：不同格式会分配到不同 CDN 节点，
+        // 前一种地址被 CDN 拒绝时自动降级
+        let attempts = AudioQuality.attempts(for: preferredLevel)
         var lastError: Error?
         for attempt in attempts {
             do {

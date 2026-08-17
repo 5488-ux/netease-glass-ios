@@ -175,9 +175,38 @@ final class NeteaseAPI {
 
     func resolveDownload(for song: Song, encodeType: String = "mp3", level: String = "standard") async throws -> DownloadPermission {
         try requireLogin()
+        let context = "播放歌曲「\(song.name)」ID \(song.id)，\(encodeType)/\(level)"
+        // 优先使用专用下载接口：对部分会话返回更稳定的 ymusic CDN 地址
+        if let permission = try? await resolveFromDownloadEndpoint(song: song, level: level, context: context) {
+            return permission
+        }
+        // 降级：播放地址接口（处理试听、VIP 提示等）
+        return try await resolveFromPlayerEndpoint(song: song, encodeType: encodeType, level: level, context: context)
+    }
+
+    /// /eapi/song/enhance/download/url/v1 —— 专用下载地址（data 为单个对象）
+    private func resolveFromDownloadEndpoint(song: Song, level: String, context: String) async throws -> DownloadPermission {
         let header = deviceIdentityHeader
-        let context = "接口 /eapi/song/enhance/player/url/v1（播放歌曲「\(song.name)」ID \(song.id)，\(encodeType)/\(level)）"
-        let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": level, "encodeType": encodeType, "header": header], context: context)
+        let json = try await eAPI(path: "/eapi/song/enhance/download/url/v1", payload: ["id": "\(song.id)_0", "level": level, "header": header], context: context + "（下载接口 v1）")
+        guard let item = json["data"] as? [String: Any] else {
+            throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 失败：下载接口没有返回数据")
+        }
+        let code = int(item["code"]) ?? 200
+        if code == 200, let value = item["url"] as? String, !value.isEmpty, let url = URL(string: value) {
+            // 使用服务器返回的原始地址（不强制改为 https）：签名 URL 可能与协议绑定
+            return DownloadPermission(url: url, totalBytes: int64(item["size"]) ?? 0, bitrate: int(item["br"]))
+        }
+        let fee = int(item["fee"]) ?? song.fee
+        if fee == 1 || fee == 4 || fee == 8 || code == -110 {
+            throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 需要 VIP 或没有下载权限（错误码 \(code)）")
+        }
+        throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 下载接口返回错误码 \(code)")
+    }
+
+    /// /eapi/song/enhance/player/url/v1 —— 播放地址接口（data 为数组）
+    private func resolveFromPlayerEndpoint(song: Song, encodeType: String, level: String, context: String) async throws -> DownloadPermission {
+        let header = deviceIdentityHeader
+        let json = try await eAPI(path: "/eapi/song/enhance/player/url/v1", payload: ["ids": [song.id], "level": level, "encodeType": encodeType, "header": header], context: context + "（播放接口 v1）")
         guard let item = (json["data"] as? [[String: Any]])?.first else { throw NeteaseAPIError.downloadUnavailable("播放歌曲「\(song.name)」(ID \(song.id)) 失败：网易云没有返回播放权限信息") }
         let code = int(item["code"]) ?? -1
         if code == 200, let value = item["url"] as? String, !value.isEmpty, let url = URL(string: value) {
