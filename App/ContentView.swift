@@ -32,6 +32,7 @@ struct ContentView: View {
 
             if app.isFullPlayerPresented {
                 FullPlayerView()
+                    .ignoresSafeArea()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(100)
             }
