@@ -18,7 +18,7 @@ struct FullPlayerView: View {
             VStack(spacing: 0) {
                 topBar
                     .padding(.horizontal, 18)
-                    .padding(.top, max(proxy.safeAreaInsets.top, 8))
+                    .padding(.top, 8)
 
                 if showsLyrics {
                     lyricSection
@@ -34,7 +34,7 @@ struct FullPlayerView: View {
 
                 bottomTools
                     .padding(.horizontal, 18)
-                    .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8))
+                    .padding(.bottom, 8)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .background { backgroundLayer(size: proxy.size) }
