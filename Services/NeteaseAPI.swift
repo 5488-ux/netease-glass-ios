@@ -44,7 +44,11 @@ enum NeteaseAPIError: LocalizedError {
             case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed: return "无法连接网易云服务，请检查网络后重试"
             case .networkConnectionLost: return "网络连接中断，请返回应用后重试"
             case .cancelled: return "请求已取消"
-            default: return "网络请求失败（\(error.code.rawValue)），请稍后重试"
+            case .appTransportSecurity: return "系统安全策略拦截了音频请求（ATS），请更新应用后重试"
+            case .badServerResponse, .resourceUnavailable, .zeroByteResource: return "服务器拒绝了音频请求（可能为 403/版权限制），请尝试重新播放或更换歌曲"
+            default:
+                let raw = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                return raw.isEmpty ? "网络请求失败（错误码 \(error.code.rawValue)），请稍后重试" : "网络请求失败（错误码 \(error.code.rawValue)）：\(raw)"
             }
         }
         let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)

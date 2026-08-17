@@ -73,16 +73,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
 
         do {
             let permission = try await api.resolveDownload(for: song)
-            let options: [String: Any] = [
-                "AVURLAssetHTTPHeaderFieldsKey": [
-                    "Referer": "https://music.163.com/",
-                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15"
-                ]
-            ]
-            let asset = AVURLAsset(url: permission.url, options: options)
-            guard try await asset.load(.isPlayable) else {
-                throw NeteaseAPIError.message("网易云返回的音频地址无法播放")
-            }
+            let asset = try await loadPlayableAsset(from: permission)
             if let loadedDuration = try? await asset.load(.duration) {
                 let seconds = loadedDuration.seconds
                 if seconds.isFinite, seconds > 0 { duration = seconds }
@@ -104,6 +95,38 @@ final class AudioPlayerManager: NSObject, ObservableObject {
             isPlaying = false
             errorHandler?(NeteaseAPIError.userMessage(for: error))
         }
+    }
+
+    /// 依次尝试多种组合加载音频资源（https/http、iPhone/桌面 UA），
+    /// 全部失败时抛出带详细信息的错误，便于定位真实原因。
+    private func loadPlayableAsset(from permission: DownloadPermission) async throws -> AVURLAsset {
+        let iphoneUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15"
+        let desktopUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36 NeteaseMusicDesktop/3.0.18.203152"
+        func makeOptions(_ ua: String) -> [String: Any] {
+            ["AVURLAssetHTTPHeaderFieldsKey": ["Referer": "https://music.163.com/", "User-Agent": ua]]
+        }
+        var candidates: [(URL, [String: Any])] = [(permission.url, makeOptions(iphoneUA))]
+        if var components = URLComponents(url: permission.url, resolvingAgainstBaseURL: false), components.scheme == "https" {
+            components.scheme = "http"
+            if let httpURL = components.url { candidates.append((httpURL, makeOptions(iphoneUA))) }
+        }
+        candidates.append((permission.url, makeOptions(desktopUA)))
+
+        var lastError: Error?
+        for (url, options) in candidates {
+            let asset = AVURLAsset(url: url, options: options)
+            do {
+                if try await asset.load(.isPlayable) { return asset }
+                lastError = NeteaseAPIError.message("音频地址无法播放：\(url.absoluteString)")
+            } catch {
+                lastError = error
+            }
+        }
+        if let lastError {
+            let detail = (lastError as? URLError).map { "网络错误码 \($0.code.rawValue)：\($0.localizedDescription)" } ?? lastError.localizedDescription
+            throw NeteaseAPIError.message("音频加载失败（\(detail)）。音频地址：\(permission.url.absoluteString)")
+        }
+        throw NeteaseAPIError.message("音频加载失败：无法获取可播放的音频地址")
     }
 
     func seek(to seconds: TimeInterval) {
