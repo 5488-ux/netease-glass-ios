@@ -210,8 +210,8 @@ final class NeteaseAPI {
         do {
             return try await resolveFromPlayerEndpoint(song: song, encodeType: encodeType, level: level, context: context)
         } catch {
-            let dedicated = downloadEndpointError.map { Self.diagnosticDescription(for: $0) } ?? "没有执行"
-            let player = Self.diagnosticDescription(for: error)
+            let dedicated = downloadEndpointError.map { NeteaseAPIError.diagnosticDescription(for: $0) } ?? "没有执行"
+            let player = NeteaseAPIError.diagnosticDescription(for: error)
             throw NeteaseAPIError.downloadUnavailable(
                 "\(context)失败。专用下载接口：\(dedicated)；播放地址接口：\(player)"
             )
