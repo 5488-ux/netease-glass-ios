@@ -34,12 +34,14 @@ struct FullPlayerView: View {
 
                     playbackPanel
                         .padding(.horizontal, 18)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 8)
 
                     bottomTools
                         .padding(.horizontal, 18)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 8)
                 }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
             }
         }
         .foregroundStyle(.white)
@@ -89,10 +91,11 @@ struct FullPlayerView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 17, weight: .bold))
-                        .frame(width: 44, height: 44)
+                        .font(.system(size: 15, weight: .bold))
+                        .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.glass)
+                .controlSize(.small)
                 .accessibilityLabel("收起播放器")
 
                 Spacer()
@@ -117,63 +120,50 @@ struct FullPlayerView: View {
             }
         } label: {
             Image(systemName: "waveform.badge.magnifyingglass")
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: 44, height: 44)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 20, height: 20)
         }
         .buttonStyle(.glass)
+        .controlSize(.small)
         .accessibilityLabel("选择音质")
     }
 
     private func nowPlayingContent(availableSize: CGSize) -> some View {
-        let artworkSize = min(availableSize.width - 50, availableSize.height < 760 ? 252 : 304)
+        let artworkSize = min(availableSize.width - 64, availableSize.height < 760 ? 218 : 252)
 
-        return VStack(spacing: 18) {
-            Spacer(minLength: 8)
+        return VStack(spacing: 14) {
+            Spacer(minLength: 4)
 
             if let song = player.currentSong {
                 RemoteImage(url: song.coverURL, size: artworkSize)
-                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
                             .strokeBorder(.white.opacity(0.16), lineWidth: 0.8)
                     }
-                    .shadow(color: .black.opacity(0.26), radius: 18, y: 10)
+                    .shadow(color: .black.opacity(0.24), radius: 14, y: 8)
                     .accessibilityLabel("歌曲封面")
             }
 
             songInformation
                 .padding(.horizontal, 24)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var songInformation: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(player.currentSong?.name ?? "未在播放")
-                    .font(.title2.weight(.bold))
-                    .lineLimit(1)
-                Text(player.currentSong?.artist ?? "")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            Button {
-                player.stop()
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .bold))
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.glass)
-            .accessibilityLabel("停止播放")
+        VStack(alignment: .leading, spacing: 4) {
+            Text(player.currentSong?.name ?? "未在播放")
+                .font(.title3.weight(.bold))
+                .lineLimit(1)
+            Text(player.currentSong?.artist ?? "")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.62))
+                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var lyricSection: some View {
@@ -230,7 +220,7 @@ struct FullPlayerView: View {
     }
 
     private var playbackPanel: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             VStack(spacing: 3) {
                 progressBar
 
@@ -243,8 +233,8 @@ struct FullPlayerView: View {
                 .foregroundStyle(.white.opacity(0.58))
             }
 
-            HStack(spacing: 34) {
-                playerControlButton("gobackward.15", size: 25, label: "后退十五秒") {
+            HStack(spacing: 30) {
+                playerControlButton("gobackward.15", size: 22, label: "后退十五秒") {
                     player.seek(to: player.currentTime - 15)
                 }
 
@@ -256,26 +246,27 @@ struct FullPlayerView: View {
                             ProgressView().tint(.black)
                         } else {
                             Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 28, weight: .bold))
+                                .font(.system(size: 23, weight: .bold))
                                 .offset(x: player.isPlaying ? 0 : 2)
                         }
                     }
-                    .frame(width: 66, height: 66)
+                    .frame(width: 50, height: 50)
                 }
                 .buttonStyle(.glassProminent)
+                .controlSize(.regular)
                 .tint(.white)
                 .foregroundStyle(.black)
                 .accessibilityLabel(player.isPlaying ? "暂停" : "继续播放")
 
-                playerControlButton("goforward.15", size: 25, label: "前进十五秒") {
+                playerControlButton("goforward.15", size: 22, label: "前进十五秒") {
                     player.seek(to: player.currentTime + 15)
                 }
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .glassEffect(.regular, in: .rect(cornerRadius: 28))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
     }
 
     private var progressBar: some View {
@@ -315,36 +306,30 @@ struct FullPlayerView: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: size, weight: .semibold))
-                .frame(width: 52, height: 52)
+                .frame(width: 46, height: 46)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
     }
 
     private var bottomTools: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        showsLyrics.toggle()
-                    }
-                } label: {
-                    Label(showsLyrics ? "返回封面" : "歌词", systemImage: showsLyrics ? "rectangle.portrait" : "quote.bubble")
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
+        HStack {
+            Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    showsLyrics.toggle()
                 }
-                .buttonStyle(.glass)
-
-                Button {
-                    player.stop()
-                } label: {
-                    Label("停止", systemImage: "stop.fill")
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.glass)
+            } label: {
+                Image(systemName: showsLyrics ? "rectangle.portrait" : "quote.bubble")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 22, height: 22)
             }
+            .buttonStyle(.glass)
+            .controlSize(.small)
+            .accessibilityLabel(showsLyrics ? "返回封面" : "显示歌词")
+            Spacer()
         }
+        .frame(maxWidth: .infinity, minHeight: 42)
     }
 
     private func loadArtwork() async {

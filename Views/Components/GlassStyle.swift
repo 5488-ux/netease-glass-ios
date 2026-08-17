@@ -81,12 +81,11 @@ struct AppSectionHeader: View {
 struct RemoteImage: View {
     let url: URL?
     var size: CGFloat
-    @StateObject private var loader: RemoteImageLoader
+    @StateObject private var loader = RemoteImageLoader()
 
     init(url: URL?, size: CGFloat) {
         self.url = url
         self.size = size
-        _loader = StateObject(wrappedValue: RemoteImageLoader(url: url))
     }
 
     var body: some View {
@@ -103,21 +102,21 @@ struct RemoteImage: View {
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityHidden(true)
-        .task(id: url) { await loader.load() }
+        .task(id: url) { await loader.load(url) }
     }
 }
 
 @MainActor
 private final class RemoteImageLoader: ObservableObject {
     @Published private(set) var image: UIImage?
-    private let url: URL?
+    private var loadedURL: URL?
+    private var requestID = UUID()
 
-    init(url: URL?) {
-        self.url = url
-    }
-
-    func load() async {
-        guard image == nil else { return }
+    func load(_ url: URL?) async {
+        guard loadedURL != url || image == nil else { return }
+        let currentRequestID = UUID()
+        requestID = currentRequestID
+        loadedURL = url
         image = nil
         guard let url else { return }
         for candidate in Self.candidates(for: url) {
@@ -130,6 +129,7 @@ private final class RemoteImageLoader: ObservableObject {
                   let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),
                   let loaded = UIImage(data: data) else { continue }
+            guard requestID == currentRequestID, loadedURL == url else { return }
             image = loaded
             return
         }

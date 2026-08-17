@@ -344,12 +344,37 @@ final class DownloadManager: NSObject, ObservableObject {
 
 extension DownloadManager: URLSessionDownloadDelegate {
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        // URLSession 只保证 location 在本回调返回前有效。先同步搬到应用自己的临时文件，
+        // 再切回 MainActor 校验和写标签，否则会触发 NSCocoaErrorDomain 260（文件不存在）。
+        let stagedURL = FileManager.default.temporaryDirectory
+            .appending(path: "NeteaseGlass-\(UUID().uuidString).download")
+        do {
+            try FileManager.default.moveItem(at: location, to: stagedURL)
+        } catch {
+            Task { @MainActor in
+                guard let id = self.activeTasks[downloadTask.taskIdentifier] else { return }
+                self.activeTasks[downloadTask.taskIdentifier] = nil
+                self.fail(
+                    id: id,
+                    stage: "保存下载临时文件",
+                    summary: "下载完成，但无法接管系统临时文件",
+                    error: error,
+                    requestURL: downloadTask.originalRequest?.url
+                )
+            }
+            return
+        }
+
         Task { @MainActor in
-            guard let id = self.activeTasks[downloadTask.taskIdentifier] else { return }
+            guard let id = self.activeTasks[downloadTask.taskIdentifier] else {
+                try? FileManager.default.removeItem(at: stagedURL)
+                return
+            }
             self.activeTasks[downloadTask.taskIdentifier] = nil
 
             if let response = downloadTask.response as? HTTPURLResponse,
                !(200..<300).contains(response.statusCode) {
+                try? FileManager.default.removeItem(at: stagedURL)
                 let message = "音频服务器返回 HTTP \(response.statusCode)，没有取得有效文件"
                 self.fail(
                     id: id,
@@ -360,7 +385,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 )
                 return
             }
-            await self.finish(id: id, location: location)
+            await self.finish(id: id, location: stagedURL)
         }
     }
 
