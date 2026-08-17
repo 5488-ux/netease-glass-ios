@@ -177,8 +177,8 @@ struct FullPlayerView: View {
 
     private func nowPlayingContent(availableSize: CGSize) -> some View {
         let artworkSize = min(
-            availableSize.width - 56,
-            max(210, min(330, availableSize.height * 0.38))
+            availableSize.width - 104,
+            max(220, min(262, availableSize.height * 0.32))
         )
 
         return VStack(spacing: 0) {
@@ -372,6 +372,7 @@ struct FullPlayerView: View {
                 .foregroundStyle(.white.opacity(0.62))
 
             SystemVolumeSlider()
+                .frame(maxWidth: .infinity)
                 .frame(height: 28)
 
             Image(systemName: "speaker.wave.3.fill")
