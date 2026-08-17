@@ -80,7 +80,8 @@ struct FullPlayerView: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 38, height: 38)
-                    .background(.black.opacity(0.32), in: Circle())
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
@@ -116,7 +117,8 @@ struct FullPlayerView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(.black.opacity(0.32), in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.5))
         }
         .accessibilityLabel("选择音质")
     }
