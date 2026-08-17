@@ -5,7 +5,6 @@ import UIKit
 /// 封面与播放控制是主界面，歌词作为独立模式切换，所有悬浮控制使用 iOS 26 Liquid Glass。
 struct FullPlayerView: View {
     @EnvironmentObject private var app: AppModel
-    @Environment(\.dismiss) private var dismiss
     @State private var lyrics: [LyricLine] = []
     @State private var lyricsLoading = false
     @State private var artworkImage: UIImage?
@@ -16,33 +15,30 @@ struct FullPlayerView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack {
-                backgroundLayer
+            VStack(spacing: 0) {
+                topBar
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
 
-                VStack(spacing: 0) {
-                    topBar
-                        .padding(.horizontal, 18)
-                        .padding(.top, 8)
-
-                    if showsLyrics {
-                        lyricSection
-                            .transition(.opacity)
-                    } else {
-                        nowPlayingContent(availableSize: proxy.size)
-                            .transition(.opacity)
-                    }
-
-                    playbackPanel
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 8)
-
-                    bottomTools
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 8)
+                if showsLyrics {
+                    lyricSection
+                        .transition(.opacity)
+                } else {
+                    nowPlayingContent(availableSize: proxy.size)
+                        .transition(.opacity)
                 }
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .clipped()
+
+                playbackPanel
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 8)
+
+                bottomTools
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 8)
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .background { backgroundLayer(size: proxy.size) }
+            .clipped()
         }
         .foregroundStyle(.white)
         .task(id: player.currentSong?.id) {
@@ -51,7 +47,7 @@ struct FullPlayerView: View {
         }
     }
 
-    private var backgroundLayer: some View {
+    private func backgroundLayer(size: CGSize) -> some View {
         ZStack {
             Color(red: 0.08, green: 0.09, blue: 0.12)
 
@@ -59,6 +55,8 @@ struct FullPlayerView: View {
                 Image(uiImage: artworkImage)
                     .resizable()
                     .scaledToFill()
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
                     .blur(radius: 72)
                     .scaleEffect(1.55)
                     .opacity(0.62)
@@ -71,6 +69,8 @@ struct FullPlayerView: View {
                 endPoint: .bottom
             )
         }
+        .frame(width: size.width, height: size.height)
+        .clipped()
         .ignoresSafeArea()
         .allowsHitTesting(false)
     }
@@ -88,7 +88,6 @@ struct FullPlayerView: View {
             HStack {
                 Button {
                     app.isFullPlayerPresented = false
-                    dismiss()
                 } label: {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 15, weight: .bold))

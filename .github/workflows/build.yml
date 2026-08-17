@@ -21,6 +21,46 @@ jobs:
           sudo xcode-select -s "$XCODE_APP/Contents/Developer"
           xcodebuild -version
 
+      - name: Verify player layout in simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIMULATOR_UDID="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(device["udid"] for devices in data["devices"].values() for device in devices if device.get("isAvailable") and device["name"].startswith("iPhone")))')"
+          xcrun simctl boot "$SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+          rm -rf "$RUNNER_TEMP/SimulatorDerivedData"
+          xcodebuild \
+            -project NeteaseGlass.xcodeproj \
+            -scheme NeteaseGlass \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/SimulatorDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+          APP_PATH="$RUNNER_TEMP/SimulatorDerivedData/Build/Products/Debug-iphonesimulator/NeteaseGlass.app"
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")"
+          xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
+          xcrun simctl launch "$SIMULATOR_UDID" "$BUNDLE_ID" --ui-check-player
+          sleep 4
+          xcrun simctl io "$SIMULATOR_UDID" screenshot "$RUNNER_TEMP/full-player-layout.png"
+          xcrun simctl terminate "$SIMULATOR_UDID" "$BUNDLE_ID"
+          xcrun simctl launch "$SIMULATOR_UDID" "$BUNDLE_ID" --ui-check-player --ui-check-collapse
+          sleep 4
+          xcrun simctl io "$SIMULATOR_UDID" screenshot "$RUNNER_TEMP/collapsed-player-layout.png"
+          test -s "$RUNNER_TEMP/full-player-layout.png"
+          test -s "$RUNNER_TEMP/collapsed-player-layout.png"
+
+      - name: Upload UI verification screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeteaseGlass-ui-check
+          path: |
+            ${{ runner.temp }}/full-player-layout.png
+            ${{ runner.temp }}/collapsed-player-layout.png
+          if-no-files-found: error
+
       - name: Build without signing
         shell: bash
         run: |

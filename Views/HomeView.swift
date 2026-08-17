@@ -78,14 +78,11 @@ struct HomeView: View {
 
             Spacer(minLength: 8)
 
-            Button { showingLogin = true } label: {
-                Image(systemName: app.loginManager.isLoggedIn ? "person.crop.circle.fill" : "person.crop.circle.badge.plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 44, height: 44)
+            Button { openAccount() } label: {
+                accountButtonContent
             }
             .buttonStyle(.plain)
             .foregroundStyle(AppPalette.violet)
-            .appGlass(cornerRadius: 15)
             .accessibilityLabel(app.loginManager.isLoggedIn ? "账号" : "登录")
         }
         .padding(.vertical, 8)
@@ -247,6 +244,42 @@ struct HomeView: View {
     }
 
     private func resetResults() { songs = []; users = []; selectedPlaylist = nil }
+
+    @ViewBuilder private var accountButtonContent: some View {
+        if let user = app.loginManager.account?.user, let avatarURL = user.avatarURL {
+            RemoteImage(url: avatarURL, size: 44)
+                .clipShape(Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.72), lineWidth: 1.5)
+                }
+                .contentShape(Circle())
+        } else {
+            Image(systemName: app.loginManager.isLoggedIn ? "person.crop.circle.fill" : "person.crop.circle.badge.plus")
+                .font(.system(size: 18, weight: .semibold))
+                .frame(width: 44, height: 44)
+                .appGlass(cornerRadius: 15)
+        }
+    }
+
+    private func openAccount() {
+        if let user = app.loginManager.account?.user {
+            selectedUser = user
+            return
+        }
+        guard app.loginManager.isLoggedIn else {
+            showingLogin = true
+            return
+        }
+        Task {
+            await app.loginManager.refreshAccount()
+            if let user = app.loginManager.account?.user {
+                selectedUser = user
+            } else {
+                errorMessage = app.loginManager.errorMessage ?? "账号资料暂时没有加载成功，请稍后重试"
+            }
+        }
+    }
 
     private static func playlistID(from value: String) -> Int? {
         guard let components = URLComponents(string: value), let id = components.queryItems?.first(where: { $0.name == "id" })?.value else {

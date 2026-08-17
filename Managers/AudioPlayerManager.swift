@@ -242,6 +242,30 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         isPlaying = false
     }
 
+#if DEBUG
+    /// 仅供 CI 模拟器做播放器真实截图检查，不会进入 Release 构建行为。
+    func prepareLayoutPreview() {
+        let previewSong = Song(
+            id: -1,
+            name: "播放器布局检查",
+            artist: "NeteaseGlass",
+            album: "UI Check",
+            duration: 180,
+            coverURL: nil,
+            fee: 0,
+            isVIP: false,
+            size: nil,
+            bitrate: nil
+        )
+        currentSong = previewSong
+        playingSongID = previewSong.id
+        currentTime = 21
+        duration = previewSong.duration
+        isPlaying = false
+        isLoading = false
+    }
+#endif
+
     private func installObservers() {
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
             Task { @MainActor in
