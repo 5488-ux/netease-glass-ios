@@ -11,6 +11,7 @@
 - 可暂停、继续、重试和删除的下载队列
 - Apple Music 风格紧凑全屏播放器和单行迷你播放条，支持封面、歌词切换、音质、进度与前后跳转
 - 登录后主页显示真实账号头像，点击可查看账号资料与公开歌单
+- 歌曲卡片支持红色爱心，添加或取消后与网易云“我喜欢的音乐”双向校验同步
 - AI 生成的 iOS 26 风格应用图标
 - 下载失败详细诊断，记录接口、音质尝试、HTTP 状态、系统错误码和失败阶段
 - 下载到 `Documents/Music/`，默认写入 MP3 ID3 元数据和封面
@@ -28,8 +29,8 @@ Actions 工作流位于 `.github/workflows/build.yml`。它使用 macOS Runner�
 
 ## 版本
 
-- Marketing Version: `3.3`
-- Build Number: `26`
+- Marketing Version: `3.4`
+- Build Number: `27`
 
 ## 版本规则
 

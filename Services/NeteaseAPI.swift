@@ -163,6 +163,31 @@ final class NeteaseAPI {
         return NeteaseAccount(user: user, cookie: cookie)
     }
 
+    func likedSongIDs(userID: Int) async throws -> Set<Int> {
+        try requireLogin()
+        let json = try await weAPI(
+            path: "/weapi/song/like/get",
+            payload: ["uid": userID, "csrf_token": csrfToken],
+            context: "同步我喜欢的音乐"
+        )
+        return Set((json["ids"] as? [Any] ?? []).compactMap { int($0) })
+    }
+
+    func setSongLiked(songID: Int, liked: Bool) async throws {
+        try requireLogin()
+        _ = try await weAPI(
+            path: "/weapi/radio/like",
+            payload: [
+                "alg": "itembased",
+                "trackId": songID,
+                "like": liked,
+                "time": "3",
+                "csrf_token": csrfToken
+            ],
+            context: liked ? "添加到我喜欢的音乐" : "从我喜欢的音乐中移除"
+        )
+    }
+
     func createQRLogin() async throws -> QRLoginSession {
         var components = URLComponents(url: URL(string: "https://interface.music.163.com/api/login/qrcode/unikey")!, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "type", value: "3"), URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]

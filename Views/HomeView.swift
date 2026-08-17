@@ -54,6 +54,7 @@ struct HomeView: View {
             .alert("请求失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("知道了", role: .cancel) { errorMessage = nil }
             } message: { Text(errorMessage ?? "") }
+            .onAppear { prepareLikeLayoutCheckIfNeeded() }
         }
     }
 
@@ -244,6 +245,27 @@ struct HomeView: View {
     }
 
     private func resetResults() { songs = []; users = []; selectedPlaylist = nil }
+
+    private func prepareLikeLayoutCheckIfNeeded() {
+#if DEBUG
+        guard ProcessInfo.processInfo.arguments.contains("--ui-check-like") else { return }
+        let previewSong = Song(
+            id: -2,
+            name: "喜欢按钮布局检查",
+            artist: "NeteaseGlass",
+            album: "同步到网易云音乐",
+            duration: 180,
+            coverURL: nil,
+            fee: 0,
+            isVIP: false,
+            size: nil,
+            bitrate: nil
+        )
+        mode = .song
+        songs = [previewSong]
+        app.likeManager.prepareLayoutPreview(songID: previewSong.id, liked: true)
+#endif
+    }
 
     @ViewBuilder private var accountButtonContent: some View {
         if let user = app.loginManager.account?.user, let avatarURL = user.avatarURL {

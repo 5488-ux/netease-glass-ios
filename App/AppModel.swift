@@ -18,6 +18,7 @@ final class AppModel: ObservableObject {
     let loginManager: LoginManager
     let audioPlayer: AudioPlayerManager
     let downloadManager: DownloadManager
+    let likeManager: LikeManager
     private var cancellables: Set<AnyCancellable> = []
 
     init() {
@@ -26,12 +27,22 @@ final class AppModel: ObservableObject {
         loginManager = LoginManager(api: api)
         audioPlayer = AudioPlayerManager(api: api)
         downloadManager = DownloadManager(api: api)
+        likeManager = LikeManager(api: api)
         audioPlayer.errorHandler = { [weak self] message in self?.alertMessage = message }
         downloadManager.errorHandler = { [weak self] message in self?.alertMessage = message }
 
         loginManager.objectWillChange
             .merge(with: audioPlayer.objectWillChange, downloadManager.objectWillChange)
+            .merge(with: likeManager.objectWillChange)
             .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        loginManager.$account
+            .map { $0?.user.id }
+            .removeDuplicates()
+            .sink { [weak self] userID in
+                Task { await self?.likeManager.refresh(userID: userID) }
+            }
             .store(in: &cancellables)
     }
 }

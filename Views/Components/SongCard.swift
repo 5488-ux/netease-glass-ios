@@ -7,6 +7,8 @@ struct SongCard: View {
     private var isPlaying: Bool { app.audioPlayer.playingSongID == song.id && app.audioPlayer.isPlaying }
     private var isLoadingAudio: Bool { app.audioPlayer.playingSongID == song.id && app.audioPlayer.isLoading }
     private var downloadTask: DownloadTask? { app.downloadManager.task(for: song.id) }
+    private var isLiked: Bool { app.likeManager.isLiked(song.id) }
+    private var isLikePending: Bool { app.likeManager.isPending(song.id) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -40,6 +42,23 @@ struct SongCard: View {
             .buttonStyle(.plain)
             .foregroundStyle(AppPalette.blue)
             .accessibilityLabel(isPlaying ? "暂停试听" : "播放试听")
+            Button { toggleLike() } label: {
+                Group {
+                    if isLikePending {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.red)
+                    } else {
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                    }
+                }
+                .frame(width: 40, height: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.red)
+            .disabled(isLikePending)
+            .accessibilityLabel(isLiked ? "取消喜欢" : "添加到我喜欢的音乐")
             Button {
                 switch app.downloadManager.enqueue(song: song) {
                 case .queued, .restarted:
@@ -73,5 +92,26 @@ struct SongCard: View {
         .appGlass(cornerRadius: 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    private func toggleLike() {
+        Task {
+            if app.loginManager.account == nil, app.loginManager.isLoggedIn {
+                await app.loginManager.refreshAccount()
+            }
+            guard let userID = app.loginManager.account?.user.id else {
+                app.alertMessage = "请先登录网易云音乐，再同步我喜欢的音乐"
+                return
+            }
+
+            do {
+                let liked = try await app.likeManager.toggle(songID: song.id, userID: userID)
+                app.alertMessage = liked
+                    ? "恭喜你添加了这首歌"
+                    : "已取消喜欢，并已同步到网易云音乐"
+            } catch {
+                app.alertMessage = NeteaseAPIError.userMessage(for: error)
+            }
+        }
     }
 }

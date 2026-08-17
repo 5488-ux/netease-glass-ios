@@ -55,6 +55,11 @@ jobs:
             echo "::error::播放器展开与收起截图完全相同，UI 检查启动参数未生效"
             exit 1
           fi
+          xcrun simctl terminate "$SIMULATOR_UDID" "$BUNDLE_ID"
+          xcrun simctl launch "$SIMULATOR_UDID" "$BUNDLE_ID" --ui-check-like
+          sleep 4
+          xcrun simctl io "$SIMULATOR_UDID" screenshot "$RUNNER_TEMP/like-button-layout.png"
+          test -s "$RUNNER_TEMP/like-button-layout.png"
 
       - name: Upload UI verification screenshots
         uses: actions/upload-artifact@v4
@@ -63,6 +68,7 @@ jobs:
           path: |
             ${{ runner.temp }}/full-player-layout.png
             ${{ runner.temp }}/collapsed-player-layout.png
+            ${{ runner.temp }}/like-button-layout.png
           if-no-files-found: error
 
       - name: Build without signing
