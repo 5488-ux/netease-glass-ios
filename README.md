@@ -25,5 +25,10 @@ Actions 工作流位于 `.github/workflows/build.yml`。它使用 macOS Runner�
 
 ## 版本
 
-- Marketing Version: `1.9`
-- Build Number: `12`
+- Marketing Version: `2.0`
+- Build Number: `13`
+
+## 版本规则
+
+- 每发布一个新版本，在现有版本号基础上加 `0.1`（例如 `1.9 → 2.0 → 2.1`），同时构建号（Build Number）加 `1`。
+- 修改位置：`NeteaseGlass.xcodeproj/project.pbxproj` 中的 `MARKETING_VERSION` 和 `CURRENT_PROJECT_VERSION`，并同步更新本文件。
