@@ -44,7 +44,6 @@ enum NeteaseAPIError: LocalizedError {
             case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed: return "无法连接网易云服务，请检查网络后重试"
             case .networkConnectionLost: return "网络连接中断，请返回应用后重试"
             case .cancelled: return "请求已取消"
-            case .appTransportSecurity: return "系统安全策略拦截了音频请求（ATS），请更新应用后重试"
             case .badServerResponse, .resourceUnavailable, .zeroByteResource: return "服务器拒绝了音频请求（可能为 403/版权限制），请尝试重新播放或更换歌曲"
             default:
                 let raw = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -60,6 +59,7 @@ final class NeteaseAPI {
     private let session: URLSession
     private let musicURL = URL(string: "https://music.163.com")!
     private let interfaceURL = URL(string: "https://interface3.music.163.com")!
+    private let interfaceFallbackURL = URL(string: "https://interface.music.163.com")!
     private var cookie: String
 
     init(cookie: String = "") {
@@ -202,7 +202,16 @@ final class NeteaseAPI {
 
     private func eAPI(path: String, payload: [String: Any], context: String? = nil) async throws -> [String: Any] {
         let form = try NeteaseCipher.encryptEAPI(path: path, payload: payload)
-        return try await requestJSON(url: interfaceURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: context ?? "接口 \(path)")
+        let baseContext = context ?? "接口 \(path)"
+        do {
+            return try await requestJSON(url: interfaceURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: baseContext)
+        } catch let error as URLError where error.code != .cancelled {
+            // interface3.music.163.com 在某些网络环境下连接异常，回退到 interface.music.163.com 重试一次
+            return try await requestJSON(url: interfaceFallbackURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: baseContext + "（已切换备用服务器 interface.music.163.com）")
+        } catch {
+            // 服务器拒绝（-1102 等）或请求已取消时不自动重试，避免掩盖真实原因
+            throw error
+        }
     }
 
     private func fetchSongs(ids: [Int]) async throws -> [Song] {

@@ -179,7 +179,8 @@ extension DownloadManager: URLSessionDownloadDelegate {
             guard let id = self.activeTasks[downloadTask.taskIdentifier] else { return }
             self.activeTasks[downloadTask.taskIdentifier] = nil
             if let response = downloadTask.response as? HTTPURLResponse, !(200..<300).contains(response.statusCode) {
-                let message = "音频服务器返回错误（HTTP \(response.statusCode)）"
+                let urlText = downloadTask.originalRequest?.url?.absoluteString ?? "未知"
+                let message = "音频下载失败：服务器返回 HTTP \(response.statusCode)，音频地址：\(urlText)"
                 self.update(id: id) { item in item.state = .failed; item.errorMessage = message }
                 self.errorHandler?(message)
                 self.persistCompletedTasks()
