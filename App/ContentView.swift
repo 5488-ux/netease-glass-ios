@@ -34,12 +34,13 @@ struct ContentView: View {
             }
 
             if app.isFullPlayerPresented {
-                Color(red: 0.08, green: 0.09, blue: 0.12)
+                Color(red: 0.94, green: 0.96, blue: 1.00)
                     .ignoresSafeArea()
                     .transition(.opacity)
                     .zIndex(99)
 
                 FullPlayerView()
+                    .ignoresSafeArea()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(100)
             }
