@@ -3,17 +3,28 @@ import Foundation
 
 @MainActor
 final class RecommendationManager: ObservableObject {
+    enum APIStatus: Equatable {
+        case notChecked
+        case checking
+        case active
+        case failed(String)
+    }
+
     @Published private(set) var personalizedSongs: [Song] = []
     @Published private(set) var trendingSongs: [Song] = []
     @Published private(set) var platformTracks: [PlatformTrack] = []
     @Published private(set) var insight: String?
     @Published private(set) var isLoading = false
     @Published private(set) var isAnalyzing = false
+    @Published private(set) var apiStatus: APIStatus = .notChecked
+    @Published private(set) var lastErrorMessage: String?
 
     private let api: NeteaseAPI
     private let deepSeek = DeepSeekRecommendationService()
     private let appleMusic = AppleMusicChartService()
     private var analyzedUserID: Int?
+    private var recentTrendingIDs: Set<Int> = []
+    private var recentPersonalizedIDs: Set<Int> = []
 
     init(api: NeteaseAPI) {
         self.api = api
@@ -33,11 +44,13 @@ final class RecommendationManager: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
-        if let songs = try? await api.trendingSongs() { trendingSongs = Array(songs.prefix(12)) }
+        if let songs = try? await api.trendingSongs() {
+            trendingSongs = freshSongs(from: songs, excluding: &recentTrendingIDs, limit: 12)
+        }
         if let tracks = try? await appleMusic.fetchChinaTopSongs() { platformTracks = tracks }
     }
 
-    func refreshForAccount(userID: Int?, likedSongIDs: Set<Int>) async {
+    func refreshForAccount(userID: Int?, likedSongIDs: Set<Int>, forceAI: Bool = false) async {
         guard let userID else {
             personalizedSongs = []
             insight = nil
@@ -45,11 +58,11 @@ final class RecommendationManager: ObservableObject {
             return
         }
         if let songs = try? await api.dailyRecommendedSongs() {
-            personalizedSongs = Array(songs.prefix(12))
+            personalizedSongs = freshSongs(from: songs, excluding: &recentPersonalizedIDs, limit: 12)
         }
-        guard analyzedUserID != userID, !likedSongIDs.isEmpty, hasDeepSeekAPIKey else { return }
+        guard (analyzedUserID != userID || forceAI), !likedSongIDs.isEmpty, hasDeepSeekAPIKey else { return }
         analyzedUserID = userID
-        await analyzeLikes(likedSongIDs: likedSongIDs)
+        await analyzeLikes(likedSongIDs: likedSongIDs, force: forceAI)
     }
 
     func saveDeepSeekAPIKey(_ key: String) throws {
@@ -60,9 +73,42 @@ final class RecommendationManager: ObservableObject {
             try KeychainStore.saveDeepSeekAPIKey(trimmed)
         }
         analyzedUserID = nil
+        apiStatus = .notChecked
     }
 
-    func analyzeLikes(likedSongIDs: Set<Int>) async {
+    func checkDeepSeekAPI() async {
+        guard hasDeepSeekAPIKey else {
+            apiStatus = .failed("请先保存 DeepSeek API Key")
+            return
+        }
+        if case .checking = apiStatus { return }
+        apiStatus = .checking
+        do {
+            try await deepSeek.verify(apiKey: KeychainStore.loadDeepSeekAPIKey() ?? "")
+            apiStatus = .active
+        } catch {
+            apiStatus = .failed(NeteaseAPIError.userMessage(for: error))
+        }
+    }
+
+    func manuallyRefreshRecommendations(userID: Int?, likedSongIDs: Set<Int>) async {
+        lastErrorMessage = nil
+        await loadPublicRecommendations()
+        guard let userID else {
+            lastErrorMessage = "请先登录网易云音乐，才能生成个性歌曲推荐"
+            return
+        }
+        await refreshForAccount(userID: userID, likedSongIDs: likedSongIDs, forceAI: true)
+        if personalizedSongs.isEmpty {
+            lastErrorMessage = "暂无可用推荐。请确认喜欢列表已同步，或稍后再试。"
+        }
+    }
+
+    func dismissError() {
+        lastErrorMessage = nil
+    }
+
+    func analyzeLikes(likedSongIDs: Set<Int>, force: Bool = false) async {
         guard hasDeepSeekAPIKey, !likedSongIDs.isEmpty, !isAnalyzing else { return }
         isAnalyzing = true
         defer { isAnalyzing = false }
@@ -79,7 +125,8 @@ final class RecommendationManager: ObservableObject {
             let profile = try await deepSeek.analyze(
                 likedSongs: sourceSongs,
                 lyricSnippets: snippets,
-                apiKey: KeychainStore.loadDeepSeekAPIKey() ?? ""
+                apiKey: KeychainStore.loadDeepSeekAPIKey() ?? "",
+                variationSeed: force ? UUID().uuidString : nil
             )
             insight = profile.summary
             var resolved: [Song] = []
@@ -89,10 +136,25 @@ final class RecommendationManager: ObservableObject {
                     resolved.append(song)
                 }
             }
-            if !resolved.isEmpty { personalizedSongs = resolved }
+            if !resolved.isEmpty {
+                personalizedSongs = freshSongs(from: resolved, excluding: &recentPersonalizedIDs, limit: 8)
+            }
         } catch {
             insight = "AI 偏好分析暂时不可用，已显示网易云每日推荐。"
+            lastErrorMessage = NeteaseAPIError.userMessage(for: error)
         }
+    }
+
+    private func freshSongs(from candidates: [Song], excluding recentIDs: inout Set<Int>, limit: Int) -> [Song] {
+        let unique = Dictionary(grouping: candidates, by: \.id).compactMap { $0.value.first }
+        var fresh = unique.filter { !recentIDs.contains($0.id) }.shuffled()
+        if fresh.count < min(limit, unique.count) {
+            recentIDs.removeAll()
+            fresh = unique.shuffled()
+        }
+        let selected = Array(fresh.prefix(limit))
+        recentIDs.formUnion(selected.map(\.id))
+        return selected
     }
 
     func resolvePlatformTrack(_ track: PlatformTrack) async throws -> Song {

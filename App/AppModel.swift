@@ -46,10 +46,11 @@ final class AppModel: ObservableObject {
             .removeDuplicates()
             .sink { [weak self] userID in
                 Task {
-                    await self?.likeManager.refresh(userID: userID)
-                    await self?.recommendationManager.refreshForAccount(
+                    guard let self else { return }
+                    await self.likeManager.refresh(userID: userID)
+                    await self.recommendationManager.refreshForAccount(
                         userID: userID,
-                        likedSongIDs: self?.likeManager.likedSongIDs ?? []
+                        likedSongIDs: self.likeManager.likedSongIDs
                     )
                 }
             }

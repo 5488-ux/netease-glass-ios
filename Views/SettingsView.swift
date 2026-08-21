@@ -129,6 +129,8 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            apiStatusRow
+
             Button {
                 saveAIConfiguration()
             } label: {
@@ -137,6 +139,16 @@ struct SettingsView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(AppPalette.violet)
+
+            Button {
+                Task { await app.recommendationManager.checkDeepSeekAPI() }
+            } label: {
+                Label(apiCheckButtonTitle, systemImage: "bolt.horizontal.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(AppPalette.violet)
+            .disabled(!app.recommendationManager.hasDeepSeekAPIKey || isCheckingAPI)
 
             if app.recommendationManager.hasDeepSeekAPIKey {
                 Button("移除 DeepSeek API Key", role: .destructive) {
@@ -154,6 +166,33 @@ struct SettingsView: View {
         .padding(16)
         .appGlass(cornerRadius: 22)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var apiStatusRow: some View {
+        switch app.recommendationManager.apiStatus {
+        case .notChecked:
+            Text("尚未检测 API 状态")
+                .font(.caption).foregroundStyle(.secondary)
+        case .checking:
+            Label("正在检测 DeepSeek API…", systemImage: "arrow.triangle.2.circlepath")
+                .font(.caption).foregroundStyle(.secondary)
+        case .active:
+            Label("API 已激活，可正常调用", systemImage: "checkmark.circle.fill")
+                .font(.caption).foregroundStyle(.green)
+        case let .failed(message):
+            Text("API 检测失败：\(message)")
+                .font(.caption).foregroundStyle(.red)
+        }
+    }
+
+    private var isCheckingAPI: Bool {
+        if case .checking = app.recommendationManager.apiStatus { return true }
+        return false
+    }
+
+    private var apiCheckButtonTitle: String {
+        isCheckingAPI ? "正在检查 API…" : "检查 API 是否激活"
     }
 
     private func saveAIConfiguration() {

@@ -32,6 +32,11 @@ struct RecommendationView: View {
                     likedSongIDs: app.likeManager.likedSongIDs
                 )
             }
+            .alert("歌曲推荐", isPresented: Binding(get: { manager.lastErrorMessage != nil }, set: { if !$0 { manager.dismissError() } })) {
+                Button("知道了", role: .cancel) { manager.dismissError() }
+            } message: {
+                Text(manager.lastErrorMessage ?? "")
+            }
         }
     }
 
@@ -55,6 +60,22 @@ struct RecommendationView: View {
             Spacer(minLength: 8)
             if manager.isLoading || manager.isAnalyzing {
                 ProgressView().controlSize(.small)
+            } else {
+                Button {
+                    Task {
+                        await manager.manuallyRefreshRecommendations(
+                            userID: app.loginManager.account?.user.id,
+                            likedSongIDs: app.likeManager.likedSongIDs
+                        )
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 38, height: 38)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppPalette.orange)
+                .accessibilityLabel("手动刷新歌曲推荐")
             }
         }
         .padding(.vertical, 8)
@@ -64,7 +85,7 @@ struct RecommendationView: View {
     private var personalizedSection: some View {
         AppSectionHeader(
             title: "根据你喜爱的歌曲推荐",
-            subtitle: manager.hasDeepSeekAPIKey ? "打开 App 后自动由 DeepSeek 分析" : "登录后可使用网易云每日推荐"
+            subtitle: manager.hasDeepSeekAPIKey ? "打开 App 后自动分析；右上角可手动换一批" : "登录后可使用网易云每日推荐"
         )
 
         if let insight = manager.insight {

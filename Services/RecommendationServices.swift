@@ -21,7 +21,16 @@ final class DeepSeekRecommendationService {
         self.session = session
     }
 
-    func analyze(likedSongs: [Song], lyricSnippets: [String], apiKey: String) async throws -> AIRecommendationProfile {
+    func verify(apiKey: String) async throws {
+        _ = try await requestCompletion(
+            messages: [["role": "user", "content": "只返回 {\\\"ok\\\":true}" ]],
+            apiKey: apiKey,
+            temperature: 0,
+            maxTokens: 16
+        )
+    }
+
+    func analyze(likedSongs: [Song], lyricSnippets: [String], apiKey: String, variationSeed: String?) async throws -> AIRecommendationProfile {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RecommendationServiceError.missingAPIKey
         }
@@ -33,16 +42,35 @@ final class DeepSeekRecommendationService {
         keywords 必须是 6 到 8 个真实、可搜索的歌曲或歌手+歌曲名组合，不要编造解释。
         喜欢的歌曲：\(songsText)
         歌词摘要（仅作风格判断）：\(lyricsText.isEmpty ? "无" : lyricsText)
+        本次推荐标识：\(variationSeed ?? "首次推荐")。如本次推荐标识不同，请不要重复上一次的歌曲组合。
         """
-        let body: [String: Any] = [
-            "model": "deepseek-v4-flash",
-            "messages": [
+        let content = try await requestCompletion(
+            messages: [
                 ["role": "system", "content": "你是严谨的中文音乐推荐助手，必须输出有效 JSON。"],
                 ["role": "user", "content": prompt]
             ],
+            apiKey: apiKey,
+            temperature: variationSeed == nil ? 0.55 : 0.9,
+            maxTokens: 500
+        )
+        guard let profileData = content.data(using: .utf8),
+              let profile = try? JSONDecoder().decode(AIRecommendationProfile.self, from: profileData),
+              !profile.keywords.isEmpty else {
+            throw RecommendationServiceError.invalidResponse
+        }
+        return profile
+    }
+
+    private func requestCompletion(messages: [[String: String]], apiKey: String, temperature: Double, maxTokens: Int) async throws -> String {
+        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw RecommendationServiceError.missingAPIKey
+        }
+        let body: [String: Any] = [
+            "model": "deepseek-v4-flash",
+            "messages": messages,
             "thinking": ["type": "disabled"],
-            "temperature": 0.55,
-            "max_tokens": 500,
+            "temperature": temperature,
+            "max_tokens": maxTokens,
             "response_format": ["type": "json_object"]
         ]
         var request = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
@@ -60,12 +88,10 @@ final class DeepSeekRecommendationService {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let content = (choices.first?["message"] as? [String: Any])?["content"] as? String,
-              let profileData = content.data(using: .utf8),
-              let profile = try? JSONDecoder().decode(AIRecommendationProfile.self, from: profileData),
-              !profile.keywords.isEmpty else {
+              !content.isEmpty else {
             throw RecommendationServiceError.invalidResponse
         }
-        return profile
+        return content
     }
 }
 
