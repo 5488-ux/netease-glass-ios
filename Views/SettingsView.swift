@@ -4,6 +4,8 @@ struct SettingsView: View {
     @EnvironmentObject private var app: AppModel
     @State private var showingLogin = false
     @State private var selectedPlaylist: Playlist?
+    @State private var deepSeekAPIKey = ""
+    @State private var aiConfigurationMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -67,6 +69,8 @@ struct SettingsView: View {
                             .appGlass(cornerRadius: 22)
                         }
 
+                        aiRecommendationSettings
+
                         AppSectionHeader(title: "关于", subtitle: "应用信息与文件保存说明")
                         VStack(alignment: .leading, spacing: 8) {
                             Label("NeteaseGlass", systemImage: "waveform")
@@ -91,6 +95,9 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingLogin) { QRLoginView() }
             .sheet(item: $selectedPlaylist) { PlaylistDetailView(playlist: $0) }
+            .alert("AI 推荐", isPresented: Binding(get: { aiConfigurationMessage != nil }, set: { if !$0 { aiConfigurationMessage = nil } })) {
+                Button("知道了", role: .cancel) { aiConfigurationMessage = nil }
+            } message: { Text(aiConfigurationMessage ?? "") }
             .alert("刷新登录状态失败", isPresented: Binding(get: {
                 app.loginManager.isLoggedIn && app.loginManager.errorMessage != nil
             }, set: { if !$0 { app.loginManager.errorMessage = nil } })) {
@@ -98,6 +105,74 @@ struct SettingsView: View {
             } message: {
                 Text(app.loginManager.errorMessage ?? "")
             }
+        }
+    }
+
+    private var aiRecommendationSettings: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            AppSectionHeader(
+                title: "AI 音乐推荐",
+                subtitle: "App 打开后自动分析喜欢歌曲；只发送歌曲、歌手和少量歌词摘要，不会上传登录 Cookie"
+            )
+
+            SecureField("DeepSeek API Key", text: $deepSeekAPIKey)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(12)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            HStack(spacing: 10) {
+                Image(systemName: app.recommendationManager.hasDeepSeekAPIKey ? "checkmark.shield.fill" : "key.fill")
+                    .foregroundStyle(app.recommendationManager.hasDeepSeekAPIKey ? .green : AppPalette.violet)
+                Text(app.recommendationManager.hasDeepSeekAPIKey ? "DeepSeek 密钥已安全保存在本机钥匙串" : "保存密钥后，推荐页会在启动时自动分析")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                saveAIConfiguration()
+            } label: {
+                Label("保存 AI 配置", systemImage: "checkmark.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppPalette.violet)
+
+            if app.recommendationManager.hasDeepSeekAPIKey {
+                Button("移除 DeepSeek API Key", role: .destructive) {
+                    do {
+                        try app.recommendationManager.saveDeepSeekAPIKey("")
+                        deepSeekAPIKey = ""
+                        aiConfigurationMessage = "已移除 DeepSeek API Key，之后不会发送新的偏好分析请求"
+                    } catch {
+                        aiConfigurationMessage = error.localizedDescription
+                    }
+                }
+                .font(.caption)
+            }
+        }
+        .padding(16)
+        .appGlass(cornerRadius: 22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func saveAIConfiguration() {
+        do {
+            try app.recommendationManager.saveDeepSeekAPIKey(deepSeekAPIKey)
+            deepSeekAPIKey = ""
+            aiConfigurationMessage = app.loginManager.account == nil
+                ? "已保存。登录网易云并拥有喜欢歌曲后，App 打开时会自动开始分析。"
+                : "已保存。当前账号的喜欢歌曲将自动开始分析。"
+            if let userID = app.loginManager.account?.user.id {
+                Task {
+                    await app.recommendationManager.refreshForAccount(
+                        userID: userID,
+                        likedSongIDs: app.likeManager.likedSongIDs
+                    )
+                }
+            }
+        } catch {
+            aiConfigurationMessage = error.localizedDescription
         }
     }
 

@@ -56,7 +56,7 @@ struct FullPlayerView: View {
             .background { backgroundLayer(size: proxy.size) }
             .clipped()
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .offset(y: max(0, verticalDrag))
         .task(id: player.currentSong?.id) {
             await loadArtwork()
@@ -66,7 +66,7 @@ struct FullPlayerView: View {
 
     private var grabber: some View {
         Capsule()
-            .fill(.white.opacity(0.48))
+            .fill(Color.primary.opacity(0.34))
             .frame(width: 48, height: 5)
             .frame(height: 20)
             .accessibilityHidden(true)
@@ -90,7 +90,7 @@ struct FullPlayerView: View {
 
     private func backgroundLayer(size: CGSize) -> some View {
         ZStack {
-            Color(red: 0.08, green: 0.09, blue: 0.12)
+            Color(red: 0.94, green: 0.96, blue: 1.00)
 
             if let artworkImage {
                 Image(uiImage: artworkImage)
@@ -100,12 +100,12 @@ struct FullPlayerView: View {
                     .clipped()
                     .blur(radius: 78)
                     .scaleEffect(1.62)
-                    .opacity(0.58)
+                    .opacity(0.16)
             }
 
-            Color.black.opacity(0.34)
+            Color.white.opacity(0.50)
             LinearGradient(
-                colors: [.black.opacity(0.04), .black.opacity(0.32)],
+                colors: [.white.opacity(0.08), AppPalette.blue.opacity(0.12)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -124,7 +124,7 @@ struct FullPlayerView: View {
                         .font(.subheadline.weight(.semibold))
                     Text(player.preferredLevelTitle)
                         .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.58))
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -198,17 +198,17 @@ struct FullPlayerView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 19, style: .continuous)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.7)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.7)
                 }
                 .shadow(color: .black.opacity(0.22), radius: 16, y: 9)
                 .accessibilityLabel("歌曲封面")
         } else {
             ZStack {
                 RoundedRectangle(cornerRadius: 19, style: .continuous)
-                    .fill(.white.opacity(0.08))
+                    .fill(Color.primary.opacity(0.06))
                 Image(systemName: "music.note")
                     .font(.system(size: size * 0.3, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.18))
+                    .foregroundStyle(AppPalette.blue.opacity(0.55))
             }
             .frame(width: size, height: size)
             .accessibilityLabel("暂无歌曲封面")
@@ -222,7 +222,7 @@ struct FullPlayerView: View {
                 .lineLimit(1)
             Text(player.currentSong?.artist ?? "")
                 .font(.title3.weight(.medium))
-                .foregroundStyle(.white.opacity(0.58))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,8 +234,8 @@ struct FullPlayerView: View {
                 LazyVStack(alignment: .leading, spacing: 24) {
                     if lyricsLoading {
                         ProgressView("正在加载歌词")
-                            .tint(.white)
-                            .foregroundStyle(.white.opacity(0.7))
+                            .tint(AppPalette.blue)
+                            .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 70)
                     } else if lyrics.isEmpty {
@@ -244,7 +244,7 @@ struct FullPlayerView: View {
                             systemImage: "quote.bubble",
                             description: Text("这首歌曲没有返回可用歌词")
                         )
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(.secondary)
                         .padding(.top, 56)
                     } else {
                         ForEach(Array(lyrics.enumerated()), id: \.element.id) { index, line in
@@ -253,7 +253,7 @@ struct FullPlayerView: View {
                             } label: {
                                 Text(line.text)
                                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                                    .foregroundStyle(index == currentLyricIndex ? .white : .white.opacity(0.32))
+                                    .foregroundStyle(index == currentLyricIndex ? Color.primary : Color.secondary.opacity(0.54))
                                     .multilineTextAlignment(.leading)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .contentShape(Rectangle())
@@ -310,7 +310,7 @@ struct FullPlayerView: View {
                 Text("−\(timeText(player.remainingTime))")
             }
             .font(.caption2.monospacedDigit())
-            .foregroundStyle(.white.opacity(0.54))
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -327,7 +327,7 @@ struct FullPlayerView: View {
             } label: {
                 ZStack {
                     if player.isLoading {
-                        ProgressView().tint(.white)
+                        ProgressView().tint(AppPalette.blue)
                     } else {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 38, weight: .bold))
@@ -368,7 +368,7 @@ struct FullPlayerView: View {
         HStack(spacing: 12) {
             Image(systemName: "speaker.fill")
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.62))
+                .foregroundStyle(.secondary)
 
             Slider(
                 value: Binding(
@@ -377,13 +377,13 @@ struct FullPlayerView: View {
                 ),
                 in: 0...1
             )
-                .tint(.white.opacity(0.9))
+                .tint(AppPalette.blue)
                 .frame(maxWidth: .infinity)
                 .frame(height: 28)
 
             Image(systemName: "speaker.wave.3.fill")
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.62))
+                .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("系统音量")
@@ -399,7 +399,7 @@ struct FullPlayerView: View {
                 Image(systemName: showsLyrics ? "rectangle.portrait" : "quote.bubble")
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 42, height: 38)
-                    .background(showsLyrics ? .white.opacity(0.16) : .clear, in: Capsule())
+                    .background(showsLyrics ? AppPalette.blue.opacity(0.14) : .clear, in: Capsule())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(showsLyrics ? "返回封面" : "显示歌词")
@@ -409,7 +409,7 @@ struct FullPlayerView: View {
                 .accessibilityLabel("隔空播放")
         }
         .frame(maxWidth: .infinity, minHeight: 42)
-        .foregroundStyle(.white.opacity(0.72))
+        .foregroundStyle(.secondary)
     }
 
     private var progressBar: some View {
@@ -420,10 +420,10 @@ struct FullPlayerView: View {
 
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(.white.opacity(0.2))
+                    .fill(Color.primary.opacity(0.16))
                     .frame(height: draggingProgress == nil ? 4 : 7)
                 Capsule()
-                    .fill(.white.opacity(0.9))
+                    .fill(AppPalette.blue)
                     .frame(width: max(0, width * filled), height: draggingProgress == nil ? 4 : 7)
             }
             .frame(maxHeight: .infinity, alignment: .center)
@@ -501,13 +501,13 @@ private struct AirPlayRouteButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView(frame: .zero)
         view.prioritizesVideoDevices = false
-        view.tintColor = UIColor.white.withAlphaComponent(0.72)
-        view.activeTintColor = .white
+        view.tintColor = UIColor.label.withAlphaComponent(0.72)
+        view.activeTintColor = UIColor.label
         return view
     }
 
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
-        uiView.tintColor = UIColor.white.withAlphaComponent(0.72)
-        uiView.activeTintColor = .white
+        uiView.tintColor = UIColor.label.withAlphaComponent(0.72)
+        uiView.activeTintColor = UIColor.label
     }
 }

@@ -36,6 +36,11 @@ enum NeteaseAPIError: LocalizedError {
     }
 
     static func userMessage(for error: Error) -> String {
+        if let apiError = error as? NeteaseAPIError,
+           case let .serverCode(code, _) = apiError,
+           code == -460 {
+            return "网易云暂时拒绝了此操作（账号或网络触发风控）。请不要连续点击，等待一会儿后重新扫码登录再试。"
+        }
         if let error = error as? NeteaseAPIError { return error.errorDescription ?? "网易云请求失败" }
         if let error = error as? URLError {
             switch error.code {
@@ -186,6 +191,35 @@ final class NeteaseAPI {
             ],
             context: liked ? "添加到我喜欢的音乐" : "从我喜欢的音乐中移除"
         )
+    }
+
+    /// 登录后返回网易云每日推荐；所有条目仍按当前账号权限播放或下载。
+    func dailyRecommendedSongs() async throws -> [Song] {
+        try requireLogin()
+        let json = try await weAPI(
+            path: "/weapi/v2/discovery/recommend/songs",
+            payload: ["csrf_token": csrfToken],
+            context: "获取网易云每日推荐"
+        )
+        return ((json["data"] as? [String: Any])?["dailySongs"] as? [[String: Any]] ?? []).compactMap(parseSong)
+    }
+
+    /// 网易云公开新歌速递，可在未登录时作为推荐页热歌来源。
+    func trendingSongs() async throws -> [Song] {
+        let json = try await weAPI(
+            path: "/weapi/personalized/newsong",
+            payload: ["limit": 20, "total": true, "csrf_token": csrfToken],
+            context: "获取网易云热歌"
+        )
+        let entries = json["result"] as? [[String: Any]] ?? []
+        return entries.compactMap { entry in
+            parseSong(entry["song"] as? [String: Any] ?? entry)
+        }
+    }
+
+    func songs(ids: [Int]) async throws -> [Song] {
+        try requireLogin()
+        return try await fetchSongs(ids: ids)
     }
 
     func createQRLogin() async throws -> QRLoginSession {

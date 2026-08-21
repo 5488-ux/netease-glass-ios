@@ -12,6 +12,9 @@ struct ContentView: View {
                     HomeView()
                         .tabItem { Label("主页", systemImage: "house") }
                         .tag(AppTab.home)
+                    RecommendationView()
+                        .tabItem { Label("推荐", systemImage: "sparkles") }
+                        .tag(AppTab.recommendations)
                     DownloadsView()
                         .tabItem { Label("下载", systemImage: "arrow.down.circle") }
                         .badge(app.downloadManager.tasks.filter { $0.state == .downloading || $0.state == .waiting }.count)
@@ -58,6 +61,10 @@ struct ContentView: View {
 
     private func prepareLayoutCheckIfNeeded() {
 #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-check-recommendations") {
+            app.selectedTab = .recommendations
+            return
+        }
         guard ProcessInfo.processInfo.arguments.contains("--ui-check-player") else { return }
         app.audioPlayer.prepareLayoutPreview()
         app.isFullPlayerPresented = true

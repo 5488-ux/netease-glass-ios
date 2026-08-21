@@ -65,6 +65,11 @@ jobs:
           sleep 4
           xcrun simctl io "$SIMULATOR_UDID" screenshot "$RUNNER_TEMP/lyrics-player-layout.png"
           test -s "$RUNNER_TEMP/lyrics-player-layout.png"
+          xcrun simctl terminate "$SIMULATOR_UDID" "$BUNDLE_ID"
+          xcrun simctl launch "$SIMULATOR_UDID" "$BUNDLE_ID" --ui-check-recommendations
+          sleep 4
+          xcrun simctl io "$SIMULATOR_UDID" screenshot "$RUNNER_TEMP/recommendations-layout.png"
+          test -s "$RUNNER_TEMP/recommendations-layout.png"
 
       - name: Upload UI verification screenshots
         uses: actions/upload-artifact@v4
@@ -75,6 +80,7 @@ jobs:
             ${{ runner.temp }}/collapsed-player-layout.png
             ${{ runner.temp }}/like-button-layout.png
             ${{ runner.temp }}/lyrics-player-layout.png
+            ${{ runner.temp }}/recommendations-layout.png
           if-no-files-found: error
 
       - name: Build without signing

@@ -12,6 +12,8 @@
 - Apple Music 信息层级的全屏播放器和单行迷你播放条，支持封面、歌词切换、音质、进度、前后跳转、播放音量与隔空播放
 - 登录后主页显示真实账号头像，点击可查看账号资料与公开歌单
 - 歌曲卡片支持红色爱心，添加或取消后与网易云“我喜欢的音乐”双向校验同步
+- 推荐页：网易云每日推荐、新歌速递、Apple Music 中国区公开热歌榜；外部榜单条目会映射到网易云后播放
+- 可选 DeepSeek 偏好分析：密钥仅保存于本机钥匙串，App 打开后自动根据喜欢歌曲和少量歌词摘要生成推荐
 - AI 生成的 iOS 26 风格应用图标
 - 下载失败详细诊断，记录接口、音质尝试、HTTP 状态、系统错误码和失败阶段
 - 下载到 `Documents/Music/`，默认写入 MP3 ID3 元数据和封面
@@ -29,8 +31,8 @@ Actions 工作流位于 `.github/workflows/build.yml`。它使用 macOS Runner�
 
 ## 版本
 
-- Marketing Version: `3.5`
-- Build Number: `28`
+- Marketing Version: `3.6`
+- Build Number: `29`
 
 ## 版本规则
 
