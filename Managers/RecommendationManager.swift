@@ -18,6 +18,11 @@ final class RecommendationManager: ObservableObject {
     @Published private(set) var isAnalyzing = false
     @Published private(set) var apiStatus: APIStatus = .notChecked
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var localAIPlaylists: [LocalAIPlaylist] = []
+    @Published private(set) var playlistThinking = ""
+    @Published private(set) var playlistOutput = ""
+    @Published private(set) var playlistGenerationStatus: String?
+    @Published private(set) var isCreatingPlaylist = false
 
     private let api: NeteaseAPI
     private let deepSeek = DeepSeekRecommendationService()
@@ -25,9 +30,11 @@ final class RecommendationManager: ObservableObject {
     private var analyzedUserID: Int?
     private var recentTrendingIDs: Set<Int> = []
     private var recentPersonalizedIDs: Set<Int> = []
+    private let localPlaylistStorageKey = "neteaseglass.local-ai-playlists.v1"
 
     init(api: NeteaseAPI) {
         self.api = api
+        loadLocalAIPlaylists()
     }
 
     var hasDeepSeekAPIKey: Bool {
@@ -106,6 +113,83 @@ final class RecommendationManager: ObservableObject {
 
     func dismissError() {
         lastErrorMessage = nil
+    }
+
+    func createLocalAIPlaylist(preferences: AIPlaylistPreferences) async -> LocalAIPlaylist? {
+        guard hasDeepSeekAPIKey else {
+            lastErrorMessage = "请先在设置中保存并检测 DeepSeek API Key"
+            return nil
+        }
+        guard api.hasCookie else {
+            lastErrorMessage = "请先登录网易云音乐，AI 才能把歌单中的歌曲匹配为可播放条目"
+            return nil
+        }
+        guard !isCreatingPlaylist else { return nil }
+        isCreatingPlaylist = true
+        playlistThinking = ""
+        playlistOutput = ""
+        playlistGenerationStatus = "V4 Pro 正在深度思考…"
+        defer { isCreatingPlaylist = false }
+        do {
+            let plan = try await deepSeek.streamPlaylistPlan(
+                preferences: preferences,
+                apiKey: KeychainStore.loadDeepSeekAPIKey() ?? ""
+            ) { [weak self] reasoning, content in
+                guard let self else { return }
+                if let reasoning {
+                    await self.appendPlaylistCharacters(reasoning, toThinking: true)
+                }
+                if let content {
+                    await self.appendPlaylistCharacters(content, toThinking: false)
+                }
+            }
+            playlistGenerationStatus = "正在匹配网易云歌曲…"
+            var songs: [Song] = []
+            for query in plan.queries.prefix(preferences.trackCount) {
+                if let song = try? await api.searchSongs(query).first,
+                   !songs.contains(where: { $0.id == song.id }) {
+                    songs.append(song)
+                }
+            }
+            guard !songs.isEmpty else {
+                throw RecommendationServiceError.message("AI 已给出歌单方案，但未能在网易云匹配到可播放歌曲")
+            }
+            let playlist = LocalAIPlaylist(
+                id: UUID(),
+                createdAt: Date(),
+                preferences: preferences,
+                title: plan.title,
+                summary: plan.summary,
+                thoughts: plan.thoughts,
+                songs: songs
+            )
+            localAIPlaylists.insert(playlist, at: 0)
+            persistLocalAIPlaylists()
+            playlistGenerationStatus = "已创建，仅保存在本机"
+            return playlist
+        } catch {
+            playlistGenerationStatus = "创建失败"
+            lastErrorMessage = NeteaseAPIError.userMessage(for: error)
+            return nil
+        }
+    }
+
+    private func appendPlaylistCharacters(_ value: String, toThinking: Bool) async {
+        for character in value {
+            if toThinking { playlistThinking.append(character) } else { playlistOutput.append(character) }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
+    private func loadLocalAIPlaylists() {
+        guard let data = UserDefaults.standard.data(forKey: localPlaylistStorageKey),
+              let playlists = try? JSONDecoder().decode([LocalAIPlaylist].self, from: data) else { return }
+        localAIPlaylists = playlists.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private func persistLocalAIPlaylists() {
+        guard let data = try? JSONEncoder().encode(localAIPlaylists) else { return }
+        UserDefaults.standard.set(data, forKey: localPlaylistStorageKey)
     }
 
     func analyzeLikes(likedSongIDs: Set<Int>, force: Bool = false) async {

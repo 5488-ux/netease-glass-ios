@@ -61,6 +61,77 @@ final class DeepSeekRecommendationService {
         return profile
     }
 
+    /// 使用 V4 Pro 深度思考并通过 SSE 逐步回传思考和最终歌单 JSON。
+    func streamPlaylistPlan(
+        preferences: AIPlaylistPreferences,
+        apiKey: String,
+        onDelta: @escaping @Sendable (_ reasoning: String?, _ content: String?) async -> Void
+    ) async throws -> AIPlaylistPlan {
+        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw RecommendationServiceError.missingAPIKey
+        }
+        let prompt = """
+        你正在为用户制作一个仅保存在本地的音乐歌单。请认真深度思考用户选择，避免泛泛而谈，选择可在网易云搜索到的真实歌曲。
+        用户选择：\(preferences.promptDescription)
+        最终只能输出 JSON，不要 Markdown：
+        {"title":"不超过16字的歌单名","summary":"不超过48字的歌单简介","thoughts":["至少3条具体创作想法"],"queries":["歌曲名 歌手", "..."]}
+        queries 必须给出恰好 \(preferences.trackCount) 条真实歌曲名加歌手，覆盖不同节奏但保持同一主题。
+        """
+        let body: [String: Any] = [
+            "model": "deepseek-v4-pro",
+            "messages": [
+                ["role": "system", "content": "你是专业音乐策展人。先深度思考，再给出准确的本地歌单方案。"],
+                ["role": "user", "content": prompt]
+            ],
+            "thinking": ["type": "enabled"],
+            "reasoning_effort": "high",
+            "stream": true,
+            "temperature": 0.75,
+            "max_tokens": 1_400,
+            "response_format": ["type": "json_object"]
+        ]
+        var request = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 120
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (bytes, response) = try await session.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else { throw RecommendationServiceError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            var errorText = ""
+            for try await line in bytes.lines {
+                errorText += line
+                if errorText.count > 400 { break }
+            }
+            throw RecommendationServiceError.message("DeepSeek 歌单生成失败（HTTP \(http.statusCode)）\(errorText.isEmpty ? "" : "：\(errorText.prefix(220))")")
+        }
+
+        var finalContent = ""
+        for try await line in bytes.lines {
+            guard line.hasPrefix("data:") else { continue }
+            let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            if payload == "[DONE]" { break }
+            guard let data = payload.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let delta = choices.first?["delta"] as? [String: Any] else { continue }
+            let reasoning = delta["reasoning_content"] as? String
+            let content = delta["content"] as? String
+            if let content { finalContent += content }
+            if reasoning != nil || content != nil { await onDelta(reasoning, content) }
+        }
+        guard let planData = finalContent.data(using: .utf8),
+              let plan = try? JSONDecoder().decode(AIPlaylistPlan.self, from: planData),
+              !plan.title.isEmpty,
+              !plan.queries.isEmpty else {
+            throw RecommendationServiceError.invalidResponse
+        }
+        return plan
+    }
+
     private func requestCompletion(messages: [[String: String]], apiKey: String, temperature: Double, maxTokens: Int) async throws -> String {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RecommendationServiceError.missingAPIKey

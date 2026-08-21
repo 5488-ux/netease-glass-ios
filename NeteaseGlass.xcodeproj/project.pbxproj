@@ -43,6 +43,7 @@
 		A10000000000000000000023 /* RecommendationServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* RecommendationServices.swift */; };
 		A10000000000000000000024 /* RecommendationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* RecommendationManager.swift */; };
 		A10000000000000000000025 /* RecommendationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* RecommendationView.swift */; };
+		A10000000000000000000026 /* AIPlaylistViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* AIPlaylistViews.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,6 +84,7 @@
 		B10000000000000000000023 /* RecommendationServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationServices.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 /* RecommendationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationManager.swift; sourceTree = "<group>"; };
 		B10000000000000000000025 /* RecommendationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationView.swift; sourceTree = "<group>"; };
+		B10000000000000000000026 /* AIPlaylistViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPlaylistViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,7 +104,7 @@
 		C10000000000000000000005 /* Models */ = {isa = PBXGroup; children = (B10000000000000000000007, B10000000000000000000008, B10000000000000000000009, B1000000000000000000000A, B1000000000000000000000B, B1000000000000000000001C, B1000000000000000000001F, B10000000000000000000022); name = Models; path = Models; sourceTree = "<group>"; };
 		C10000000000000000000006 /* Services */ = {isa = PBXGroup; children = (B1000000000000000000000C, B10000000000000000000023); name = Services; path = Services; sourceTree = "<group>"; };
 		C10000000000000000000007 /* Utilities */ = {isa = PBXGroup; children = (B1000000000000000000000D, B1000000000000000000000E, B1000000000000000000000F, B10000000000000000000010); name = Utilities; path = Utilities; sourceTree = "<group>"; };
-		C10000000000000000000008 /* Views */ = {isa = PBXGroup; children = (C10000000000000000000009, B10000000000000000000015, B10000000000000000000016, B10000000000000000000017, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001A, B1000000000000000000001E, B10000000000000000000025); name = Views; path = Views; sourceTree = "<group>"; };
+		C10000000000000000000008 /* Views */ = {isa = PBXGroup; children = (C10000000000000000000009, B10000000000000000000015, B10000000000000000000016, B10000000000000000000017, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001A, B1000000000000000000001E, B10000000000000000000025, B10000000000000000000026); name = Views; path = Views; sourceTree = "<group>"; };
 		C10000000000000000000009 /* Components */ = {isa = PBXGroup; children = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, B10000000000000000000014, B1000000000000000000001D); name = Components; path = Components; sourceTree = "<group>"; };
 		C1000000000000000000000A /* Products */ = {isa = PBXGroup; children = (B1000000000000000000001B); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
@@ -209,6 +211,7 @@
 				A10000000000000000000023,
 				A10000000000000000000024,
 				A10000000000000000000025,
+				A10000000000000000000026,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -223,11 +226,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 3.8;
+				MARKETING_VERSION = 3.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -247,11 +250,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 3.8;
+				MARKETING_VERSION = 3.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.NeteaseGlass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

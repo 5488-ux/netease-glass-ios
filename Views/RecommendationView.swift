@@ -4,6 +4,10 @@ import SwiftUI
 struct RecommendationView: View {
     @EnvironmentObject private var app: AppModel
     @State private var resolvingTrackID: String?
+    @State private var showingAIComposer = false
+    @State private var showingAIGeneration = false
+    @State private var generatedPlaylist: LocalAIPlaylist?
+    @State private var selectedLocalPlaylist: LocalAIPlaylist?
 
     private var manager: RecommendationManager { app.recommendationManager }
 
@@ -14,6 +18,7 @@ struct RecommendationView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 18) {
                         header
+                        localAIPlaylistSection
                         personalizedSection
                         platformSection
                     }
@@ -36,6 +41,19 @@ struct RecommendationView: View {
                 Button("知道了", role: .cancel) { manager.dismissError() }
             } message: {
                 Text(manager.lastErrorMessage ?? "")
+            }
+            .sheet(isPresented: $showingAIComposer) {
+                AIPlaylistComposerView { preferences in
+                    generatedPlaylist = nil
+                    showingAIGeneration = true
+                    Task { generatedPlaylist = await manager.createLocalAIPlaylist(preferences: preferences) }
+                }
+            }
+            .sheet(isPresented: $showingAIGeneration) {
+                AIPlaylistGenerationView(playlist: generatedPlaylist)
+            }
+            .sheet(item: $selectedLocalPlaylist) { playlist in
+                LocalAIPlaylistDetailView(playlist: playlist)
             }
         }
     }
@@ -79,6 +97,44 @@ struct RecommendationView: View {
             }
         }
         .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var localAIPlaylistSection: some View {
+        HStack(alignment: .firstTextBaseline) {
+            AppSectionHeader(title: "我的 AI 歌单", subtitle: "仅保存在本机，不同步网易云")
+            Spacer(minLength: 8)
+            Button { showingAIComposer = true } label: {
+                Label("创建", systemImage: "plus").font(.subheadline.weight(.bold))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppPalette.violet)
+        }
+
+        if manager.localAIPlaylists.isEmpty {
+            Button { showingAIComposer = true } label: {
+                Label("按选择创建第一份 AI 歌单", systemImage: "sparkles").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(AppPalette.violet)
+        } else {
+            LazyVStack(spacing: 10) {
+                ForEach(manager.localAIPlaylists.prefix(3)) { playlist in
+                    Button { selectedLocalPlaylist = playlist } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Label("本地 AI 歌单 · \(playlist.songs.count) 首", systemImage: "sparkles")
+                                .font(.caption.weight(.bold)).foregroundStyle(AppPalette.violet)
+                            Text(playlist.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+                            Text(playlist.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .appGlass(cornerRadius: 18)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     @ViewBuilder
