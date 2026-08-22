@@ -7,8 +7,6 @@ struct SongCard: View {
     private var isPlaying: Bool { app.audioPlayer.playingSongID == song.id && app.audioPlayer.isPlaying }
     private var isLoadingAudio: Bool { app.audioPlayer.playingSongID == song.id && app.audioPlayer.isLoading }
     private var downloadTask: DownloadTask? { app.downloadManager.task(for: song.id) }
-    private var isLiked: Bool { app.likeManager.isLiked(song.id) }
-    private var isLikePending: Bool { app.likeManager.isPending(song.id) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -42,23 +40,7 @@ struct SongCard: View {
             .buttonStyle(.plain)
             .foregroundStyle(AppPalette.blue)
             .accessibilityLabel(isPlaying ? "暂停试听" : "播放试听")
-            Button { toggleLike() } label: {
-                Group {
-                    if isLikePending {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(.red)
-                    } else {
-                        Image(systemName: isLiked ? "heart.fill" : "heart")
-                    }
-                }
-                .frame(width: 40, height: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.red)
-            .disabled(isLikePending)
-            .accessibilityLabel(isLiked ? "取消喜欢" : "添加到我喜欢的音乐")
+            SongLikeButton(songID: song.id, width: 40)
             Button {
                 switch app.downloadManager.enqueue(song: song) {
                 case .queued, .restarted:
@@ -94,6 +76,31 @@ struct SongCard: View {
         .contentShape(Rectangle())
     }
 
+}
+
+struct SongLikeButton: View {
+    @EnvironmentObject private var app: AppModel
+    let songID: Int
+    var width: CGFloat = 44
+
+    private var isLiked: Bool { app.likeManager.isLiked(songID) }
+    private var isPending: Bool { app.likeManager.isPending(songID) }
+
+    var body: some View {
+        Button {
+            toggleLike()
+        } label: {
+            Image(systemName: isLiked ? "heart.fill" : "heart")
+                .opacity(isPending ? 0.55 : 1)
+            .frame(width: width, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.red)
+        .disabled(isPending)
+        .accessibilityLabel(isLiked ? "取消喜欢" : "添加到我喜欢的音乐")
+    }
+
     private func toggleLike() {
         Task {
             if app.loginManager.account == nil, app.loginManager.isLoggedIn {
@@ -105,7 +112,7 @@ struct SongCard: View {
             }
 
             do {
-                let liked = try await app.likeManager.toggle(songID: song.id, userID: userID)
+                let liked = try await app.likeManager.toggle(songID: songID, userID: userID)
                 app.alertMessage = liked
                     ? "恭喜你添加了这首歌"
                     : "已取消喜欢，并已同步到网易云音乐"

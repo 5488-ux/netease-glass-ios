@@ -103,6 +103,7 @@ private struct DownloadTaskCard: View {
                 }
 
                 Spacer()
+                SongLikeButton(songID: task.song.id)
                 Text(task.state.rawValue)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(color(for: task.state))

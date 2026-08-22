@@ -45,33 +45,42 @@ final class LikeManager: ObservableObject {
         }
     }
 
-    /// 返回服务器最终确认的喜欢状态。只有重新读取喜欢列表并验证成功后才更新 UI。
+    /// 立即更新红心，再向网易云发送一次真实同步请求；失败时回滚。
+    /// 不在每次点击后立刻重拉整份喜欢列表，避免连续两次请求触发风控。
     func toggle(songID: Int, userID: Int) async throws -> Bool {
         guard !pendingSongIDs.contains(songID) else {
             return likedSongIDs.contains(songID)
         }
 
-        let targetState = !likedSongIDs.contains(songID)
-        pendingSongIDs.insert(songID)
-        defer { pendingSongIDs.remove(songID) }
-
-        try await api.setSongLiked(songID: songID, liked: targetState)
-        let serverIDs = try await api.likedSongIDs(userID: userID)
-        guard loadedUserID == userID else {
+        guard loadedUserID == nil || loadedUserID == userID else {
             throw NeteaseAPIError.message("登录账号已发生变化，请重新操作")
         }
-        let confirmedState = serverIDs.contains(songID)
-        guard confirmedState == targetState else {
-            throw NeteaseAPIError.message(
-                targetState
-                    ? "网易云已接收请求，但喜欢列表中仍没有这首歌，请稍后重试"
-                    : "网易云已接收请求，但喜欢列表中仍保留这首歌，请稍后重试"
-            )
-        }
 
+        let targetState = !likedSongIDs.contains(songID)
+        let previousState = !targetState
         loadedUserID = userID
-        likedSongIDs = serverIDs
-        return confirmedState
+        pendingSongIDs.insert(songID)
+        setLocalState(songID: songID, liked: targetState)
+
+        do {
+            try await api.setSongLiked(songID: songID, liked: targetState)
+            pendingSongIDs.remove(songID)
+            return targetState
+        } catch {
+            if loadedUserID == userID {
+                setLocalState(songID: songID, liked: previousState)
+            }
+            pendingSongIDs.remove(songID)
+            throw error
+        }
+    }
+
+    private func setLocalState(songID: Int, liked: Bool) {
+        if liked {
+            likedSongIDs.insert(songID)
+        } else {
+            likedSongIDs.remove(songID)
+        }
     }
 
 #if DEBUG
