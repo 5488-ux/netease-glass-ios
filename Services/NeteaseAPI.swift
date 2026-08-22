@@ -38,8 +38,8 @@ enum NeteaseAPIError: LocalizedError {
     static func userMessage(for error: Error) -> String {
         if let apiError = error as? NeteaseAPIError,
            case let .serverCode(code, _) = apiError,
-           code == -460 {
-            return "网易云暂时拒绝了此操作（账号或网络触发风控）。请不要连续点击，等待一会儿后重新扫码登录再试。"
+           code == -460 || code == 10003 {
+            return "网易云已对当前登录会话实施风控。请停止连续点击，退出登录后等待一段时间，再使用网易云官方 App 确认账号正常，最后回到本 App 重新扫码登录。"
         }
         if let error = error as? NeteaseAPIError { return error.errorDescription ?? "网易云请求失败" }
         if let error = error as? URLError {
@@ -112,7 +112,7 @@ final class NeteaseAPI {
     var currentCookie: String { cookie }
     func updateCookie(_ cookie: String) { self.cookie = cookie.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// 设备标识 cookie（与 eapi 请求头一致，模拟官方 PC 客户端）
+    /// 所有登录及账号请求共用的稳定 Windows 桌面身份，避免同一会话反复切换设备指纹。
     var deviceCookie: String {
         "os=pc; appver=3.1.17.204416; osver=Microsoft-Windows-10-Professional-build-19045-64bit; deviceId=\(deviceId); channel=netease; versioncode=140; resolution=1920x1080"
     }
@@ -226,7 +226,7 @@ final class NeteaseAPI {
         var components = URLComponents(url: URL(string: "https://interface.music.163.com/api/login/qrcode/unikey")!, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "type", value: "3"), URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]
         guard let url = components.url else { throw NeteaseAPIError.invalidURL }
-        let json = try await requestJSON(url: url, method: "GET", body: nil, contentType: nil, context: "生成登录二维码")
+        let json = try await requestJSON(url: url, method: "GET", body: nil, contentType: nil, context: "生成登录二维码", extraCookie: deviceCookie)
         guard let key = json["unikey"] as? String, let loginURL = URL(string: "https://music.163.com/login?codekey=\(key.formURLEncoded)") else {
             throw NeteaseAPIError.message("二维码生成失败，请刷新后重试")
         }
@@ -239,7 +239,7 @@ final class NeteaseAPI {
         components.queryItems = [URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]
         guard let url = components.url else { throw NeteaseAPIError.invalidURL }
         let body = "key=\(session.key.formURLEncoded)&type=3".data(using: .utf8)
-        let (json, response) = try await requestJSONWithResponse(url: url, method: "POST", body: body, contentType: "application/x-www-form-urlencoded", context: "查询扫码状态", toleratedCodes: [800, 801, 802, 803])
+        let (json, response) = try await requestJSONWithResponse(url: url, method: "POST", body: body, contentType: "application/x-www-form-urlencoded", context: "查询扫码状态", toleratedCodes: [800, 801, 802, 803], extraCookie: deviceCookie)
         guard let code = int(json["code"]) else { throw NeteaseAPIError.invalidResponse("二维码登录状态无法识别") }
         switch code {
         case 801: return .waiting
@@ -343,12 +343,12 @@ final class NeteaseAPI {
     private func cloudSearch(_ keyword: String, type: Int, limit: Int) async throws -> [String: Any] {
         let payload: [String: Any] = ["method": "POST", "url": "https://music.163.com/api/cloudsearch/pc", "params": ["s": keyword, "type": type, "offset": 0, "limit": limit]]
         let eparams = try NeteaseCipher.encryptLinux(payload)
-        return try await requestJSON(url: musicURL.appending(path: "/api/linux/forward"), method: "POST", body: "eparams=\(eparams.formURLEncoded)".data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: "搜索接口 /api/linux/forward")
+        return try await requestJSON(url: musicURL.appending(path: "/api/linux/forward"), method: "POST", body: "eparams=\(eparams.formURLEncoded)".data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: "搜索接口 /api/linux/forward", extraCookie: deviceCookie)
     }
 
     private func weAPI(path: String, payload: [String: Any], context: String? = nil) async throws -> [String: Any] {
         let form = try NeteaseCipher.encryptWeAPI(payload)
-        return try await requestJSON(url: musicURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: context ?? "接口 \(path)")
+        return try await requestJSON(url: musicURL.appending(path: path), method: "POST", body: form.data(using: .utf8), contentType: "application/x-www-form-urlencoded", context: context ?? "接口 \(path)", extraCookie: deviceCookie)
     }
 
     private func eAPI(path: String, payload: [String: Any], context: String? = nil) async throws -> [String: Any] {
@@ -415,7 +415,7 @@ final class NeteaseAPI {
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
         if hasCookie {
-            request.setValue(extraCookie.isEmpty ? cookie : cookie + "; " + extraCookie, forHTTPHeaderField: "Cookie")
+            request.setValue(extraCookie.isEmpty ? cookie : Self.mergeCookieHeaders(cookie, extraCookie), forHTTPHeaderField: "Cookie")
         } else if !extraCookie.isEmpty {
             request.setValue(extraCookie, forHTTPHeaderField: "Cookie")
         }
@@ -488,7 +488,7 @@ final class NeteaseAPI {
             values[key].map { value in "\(key)=\(value)" }
         }.joined(separator: "; ")
     }
-    private static let desktopUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36 NeteaseMusicDesktop/3.0.18.203152"
+    private static let desktopUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 }
 
 private enum NeteaseCipher {
