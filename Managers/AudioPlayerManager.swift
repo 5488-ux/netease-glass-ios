@@ -1,6 +1,8 @@
 import AVFoundation
 import Combine
 import Foundation
+import MediaPlayer
+import UIKit
 
 /// 音质档位（对应网易云 level 参数）
 enum AudioQuality: String, CaseIterable, Identifiable {
@@ -54,6 +56,9 @@ final class AudioPlayerManager: NSObject, ObservableObject {
     private var itemStatusObservation: NSKeyValueObservation?
     private var endObserver: NSObjectProtocol?
     private var playbackRequestID = UUID()
+    private let liveActivity = NowPlayingActivityManager()
+    private var nowPlayingArtwork: MPMediaItemArtwork?
+    private var artworkRequestID = UUID()
 
     init(api: NeteaseAPI) {
         self.api = api
@@ -66,6 +71,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP])
         try? AVAudioSession.sharedInstance().setActive(true)
         installObservers()
+        configureRemoteCommands()
     }
 
     var preferredLevelTitle: String {
@@ -87,6 +93,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
                 if !shouldResumePlaying {
                     player.pause()
                     isPlaying = false
+                    publishPlaybackState(forceActivityUpdate: true)
                 }
             }
         }
@@ -124,12 +131,14 @@ final class AudioPlayerManager: NSObject, ObservableObject {
             player.play()
             isPlaying = true
         }
+        publishPlaybackState(forceActivityUpdate: true)
     }
 
     func play(song: Song) async {
         let requestID = UUID()
         playbackRequestID = requestID
         player.pause()
+        liveActivity.end()
         itemStatusObservation = nil
         currentSong = song
         playingSongID = song.id
@@ -137,6 +146,9 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         duration = max(song.duration, 0)
         isPlaying = false
         isLoading = true
+        nowPlayingArtwork = nil
+        loadNowPlayingArtwork(for: song)
+        updateNowPlayingInfo()
 
         // 按用户选择的音质依次尝试：不同格式会分配到不同 CDN 节点，
         // 前一种地址被 CDN 拒绝时自动降级
@@ -178,6 +190,10 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         isLoading = false
         isPlaying = true
         player.play()
+        if let song = currentSong {
+            liveActivity.start(song: song, isPlaying: true, elapsedTime: currentTime, duration: duration)
+        }
+        updateNowPlayingInfo()
     }
 
     private func finishPlaybackFailure(_ error: Error) {
@@ -188,6 +204,8 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         duration = 0
         isLoading = false
         isPlaying = false
+        liveActivity.end()
+        clearNowPlayingInfo()
         errorHandler?(NeteaseAPIError.userMessage(for: error))
     }
 
@@ -239,6 +257,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         let target = min(max(seconds, 0), max(duration, 0))
         currentTime = target
         player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        publishPlaybackState(forceActivityUpdate: true)
     }
 
     func stop() {
@@ -252,6 +271,10 @@ final class AudioPlayerManager: NSObject, ObservableObject {
         duration = 0
         isLoading = false
         isPlaying = false
+        artworkRequestID = UUID()
+        nowPlayingArtwork = nil
+        liveActivity.end()
+        clearNowPlayingInfo()
     }
 
 #if DEBUG
@@ -288,6 +311,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
                 if let itemDuration = self.player.currentItem?.duration.seconds, itemDuration.isFinite, itemDuration > 0 {
                     self.duration = itemDuration
                 }
+                self.publishPlaybackState()
             }
         }
         endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { [weak self] notification in
@@ -295,6 +319,7 @@ final class AudioPlayerManager: NSObject, ObservableObject {
                 guard let self, let endedItem = notification.object as? AVPlayerItem, endedItem === self.player.currentItem else { return }
                 self.isPlaying = false
                 self.currentTime = self.duration
+                self.publishPlaybackState(forceActivityUpdate: true)
             }
         }
     }
@@ -306,9 +331,101 @@ final class AudioPlayerManager: NSObject, ObservableObject {
                 if item.status == .failed {
                     self.isPlaying = false
                     self.isLoading = false
+                    self.publishPlaybackState(forceActivityUpdate: true)
                     let detail = item.error?.localizedDescription ?? ""
                     self.errorHandler?(detail.isEmpty ? "音频播放失败，请重新选择歌曲" : "音频播放失败：\(detail)")
                 }
+            }
+        }
+    }
+
+    private func configureRemoteCommands() {
+        let commands = MPRemoteCommandCenter.shared()
+        commands.playCommand.isEnabled = true
+        commands.pauseCommand.isEnabled = true
+        commands.togglePlayPauseCommand.isEnabled = true
+        commands.changePlaybackPositionCommand.isEnabled = true
+        commands.nextTrackCommand.isEnabled = false
+        commands.previousTrackCommand.isEnabled = false
+
+        commands.playCommand.addTarget { [weak self] _ in
+            guard let self else { return .commandFailed }
+            Task { @MainActor in
+                if !self.isPlaying { self.toggleCurrent() }
+            }
+            return .success
+        }
+        commands.pauseCommand.addTarget { [weak self] _ in
+            guard let self else { return .commandFailed }
+            Task { @MainActor in
+                if self.isPlaying { self.toggleCurrent() }
+            }
+            return .success
+        }
+        commands.togglePlayPauseCommand.addTarget { [weak self] _ in
+            guard let self else { return .commandFailed }
+            Task { @MainActor in self.toggleCurrent() }
+            return .success
+        }
+        commands.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let self, let event = event as? MPChangePlaybackPositionCommandEvent else {
+                return .commandFailed
+            }
+            Task { @MainActor in self.seek(to: event.positionTime) }
+            return .success
+        }
+    }
+
+    private func publishPlaybackState(forceActivityUpdate: Bool = false) {
+        updateNowPlayingInfo()
+        guard let song = currentSong else { return }
+        liveActivity.update(
+            song: song,
+            isPlaying: isPlaying,
+            elapsedTime: currentTime,
+            duration: duration,
+            force: forceActivityUpdate
+        )
+    }
+
+    private func updateNowPlayingInfo() {
+        guard let song = currentSong else {
+            clearNowPlayingInfo()
+            return
+        }
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: song.name,
+            MPMediaItemPropertyArtist: song.artist,
+            MPMediaItemPropertyAlbumTitle: song.album,
+            MPMediaItemPropertyPlaybackDuration: max(duration, song.duration),
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: max(0, currentTime),
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue
+        ]
+        if let nowPlayingArtwork { info[MPMediaItemPropertyArtwork] = nowPlayingArtwork }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
+    }
+
+    private func clearNowPlayingInfo() {
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
+    }
+
+    private func loadNowPlayingArtwork(for song: Song) {
+        let requestID = UUID()
+        artworkRequestID = requestID
+        guard let url = song.coverURL else { return }
+        Task { [weak self] in
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                guard let self, self.artworkRequestID == requestID,
+                      self.currentSong?.id == song.id,
+                      let image = UIImage(data: data) else { return }
+                self.nowPlayingArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                self.updateNowPlayingInfo()
+            } catch {
+                return
             }
         }
     }

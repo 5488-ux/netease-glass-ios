@@ -112,6 +112,9 @@ jobs:
           set -euo pipefail
           APP_PATH="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/NeteaseGlass.app"
           test -d "$APP_PATH"
+          test -d "$APP_PATH/PlugIns/NeteaseGlassNowPlaying.appex"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSSupportsLiveActivities' "$APP_PATH/Info.plist")" = "true"
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes:0' "$APP_PATH/Info.plist" | grep -qx audio
           rm -rf "$RUNNER_TEMP/Payload" "$RUNNER_TEMP/NeteaseGlass-unsigned.ipa"
           mkdir -p "$RUNNER_TEMP/Payload"
           cp -R "$APP_PATH" "$RUNNER_TEMP/Payload/"
