@@ -187,6 +187,7 @@ struct AIPlaylistComposerView: View {
 struct AIPlaylistGenerationView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
+    @State private var autoScrollTask: Task<Void, Never>?
 
     private var manager: RecommendationManager { app.recommendationManager }
 
@@ -246,8 +247,9 @@ struct AIPlaylistGenerationView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(16)
                     }
-                    .onChange(of: manager.playlistThinking) { _, _ in proxy.scrollTo("stream-end", anchor: .bottom) }
-                    .onChange(of: manager.playlistOutput) { _, _ in proxy.scrollTo("stream-end", anchor: .bottom) }
+                    .onChange(of: manager.playlistThinking.count + manager.playlistOutput.count) { _, _ in
+                        scheduleAutoScroll(using: proxy)
+                    }
                 }
             }
             .navigationTitle(manager.isCreatingPlaylist ? "AI 正在创作" : "AI 歌单")
@@ -260,6 +262,20 @@ struct AIPlaylistGenerationView: View {
             }
         }
         .interactiveDismissDisabled(manager.isCreatingPlaylist)
+        .onDisappear {
+            autoScrollTask?.cancel()
+            autoScrollTask = nil
+        }
+    }
+
+    private func scheduleAutoScroll(using proxy: ScrollViewProxy) {
+        guard autoScrollTask == nil else { return }
+        autoScrollTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            proxy.scrollTo("stream-end", anchor: .bottom)
+            autoScrollTask = nil
+        }
     }
 
     private func streamCard(title: String, text: String, icon: String) -> some View {

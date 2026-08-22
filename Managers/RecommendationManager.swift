@@ -1,4 +1,5 @@
 import Combine
+import BackgroundTasks
 import Foundation
 
 @MainActor
@@ -38,10 +39,19 @@ final class RecommendationManager: ObservableObject {
     private var recentTrendingIDs: Set<Int> = []
     private var recentPersonalizedIDs: Set<Int> = []
     private let localPlaylistStorageKey = "neteaseglass.local-ai-playlists.v1"
+    private let continuedTaskIdentifier = "com.example.NeteaseGlass.ai-playlist"
+    private var isContinuedTaskRegistered = false
+    private var activeContinuedTask: BGContinuedProcessingTask?
+    private var playlistCreationTask: Task<Void, Never>?
+    private var pendingPlaylistRequest: (preferences: AIPlaylistPreferences, likedSongIDs: Set<Int>)?
+    private var pendingPlaylistThinking = ""
+    private var pendingPlaylistOutput = ""
+    private var streamPublishTask: Task<Void, Never>?
 
     init(api: NeteaseAPI) {
         self.api = api
         loadLocalAIPlaylists()
+        registerContinuedProcessingTask()
     }
 
     var hasDeepSeekAPIKey: Bool {
@@ -179,33 +189,141 @@ final class RecommendationManager: ObservableObject {
         }
     }
 
-    func createLocalAIPlaylist(preferences: AIPlaylistPreferences, likedSongIDs: Set<Int>) async -> LocalAIPlaylist? {
-        guard hasDeepSeekAPIKey else {
-            lastErrorMessage = "请先在设置中保存并检测 DeepSeek API Key"
-            return nil
-        }
-        guard api.hasCookie else {
-            lastErrorMessage = "请先登录网易云音乐，AI 才能把歌单中的歌曲匹配为可播放条目"
-            return nil
-        }
-        guard !likedSongIDs.isEmpty else {
-            lastErrorMessage = "没有读取到你喜欢的歌曲，请先在网易云收藏歌曲并刷新喜欢列表"
-            return nil
-        }
-        guard !isCreatingPlaylist else { return nil }
-        isCreatingPlaylist = true
+    func startLocalAIPlaylistCreation(preferences: AIPlaylistPreferences, likedSongIDs: Set<Int>) {
+        guard validatePlaylistCreation(likedSongIDs: likedSongIDs), !isCreatingPlaylist else { return }
+
         playlistThinking = ""
         playlistOutput = ""
         playlistGenerationError = nil
         lastCreatedPlaylist = nil
+        playlistGenerationStatus = "正在申请 iOS 后台持续生成…"
+        isCreatingPlaylist = true
+        pendingPlaylistRequest = (preferences, likedSongIDs)
+
+        guard isContinuedTaskRegistered else {
+            startPlaylistCreation(preferences: preferences, likedSongIDs: likedSongIDs, continuedTask: nil)
+            return
+        }
+
+        let request = BGContinuedProcessingTaskRequest(
+            identifier: continuedTaskIdentifier,
+            title: "正在创建 AI 歌单",
+            subtitle: "DeepSeek 正在结合喜欢的歌曲深度策展"
+        )
+        request.strategy = .fail
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            playlistGenerationStatus = "后台持续处理暂不可用，正在前台生成…"
+            startPlaylistCreation(preferences: preferences, likedSongIDs: likedSongIDs, continuedTask: nil)
+        }
+    }
+
+    private func validatePlaylistCreation(likedSongIDs: Set<Int>) -> Bool {
+        guard hasDeepSeekAPIKey else {
+            lastErrorMessage = "请先在设置中保存并检测 DeepSeek API Key"
+            return false
+        }
+        guard api.hasCookie else {
+            lastErrorMessage = "请先登录网易云音乐，AI 才能把歌单中的歌曲匹配为可播放条目"
+            return false
+        }
+        guard !likedSongIDs.isEmpty else {
+            lastErrorMessage = "没有读取到你喜欢的歌曲，请先在网易云收藏歌曲并刷新喜欢列表"
+            return false
+        }
+        return true
+    }
+
+    private func registerContinuedProcessingTask() {
+        guard !isContinuedTaskRegistered else { return }
+        isContinuedTaskRegistered = BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: continuedTaskIdentifier,
+            using: nil
+        ) { [weak self] task in
+            guard let continuedTask = task as? BGContinuedProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor [weak self] in
+                self?.handleContinuedProcessingTask(continuedTask)
+            }
+        }
+    }
+
+    private func handleContinuedProcessingTask(_ task: BGContinuedProcessingTask) {
+        guard let pendingPlaylistRequest else {
+            task.setTaskCompleted(success: false)
+            return
+        }
+        task.progress.totalUnitCount = 100
+        task.progress.completedUnitCount = 2
+        task.expirationHandler = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.playlistCreationTask?.cancel()
+                self?.playlistGenerationStatus = "后台生成已被系统或用户取消"
+                self?.playlistGenerationError = "iOS 已结束后台持续处理任务，请回到 App 后重新创建。"
+            }
+        }
+        startPlaylistCreation(
+            preferences: pendingPlaylistRequest.preferences,
+            likedSongIDs: pendingPlaylistRequest.likedSongIDs,
+            continuedTask: task
+        )
+    }
+
+    private func startPlaylistCreation(
+        preferences: AIPlaylistPreferences,
+        likedSongIDs: Set<Int>,
+        continuedTask: BGContinuedProcessingTask?
+    ) {
+        guard playlistCreationTask == nil else { return }
+        pendingPlaylistRequest = nil
+        activeContinuedTask = continuedTask
+        playlistCreationTask = Task { [weak self] in
+            guard let self else { return }
+            let playlist = await self.createLocalAIPlaylist(
+                preferences: preferences,
+                likedSongIDs: likedSongIDs
+            )
+            self.finishContinuedProcessing(success: playlist != nil)
+        }
+    }
+
+    private func finishContinuedProcessing(success: Bool) {
+        if success {
+            activeContinuedTask?.progress.completedUnitCount = 100
+            activeContinuedTask?.updateTitle("AI 歌单已创建", subtitle: "已保存在 NeteaseGlass 本机")
+        }
+        activeContinuedTask?.setTaskCompleted(success: success)
+        activeContinuedTask = nil
+        streamPublishTask?.cancel()
+        streamPublishTask = nil
+        flushPlaylistStreamBuffer()
+        playlistCreationTask = nil
+        pendingPlaylistRequest = nil
+    }
+
+    private func updateContinuedProgress(_ completed: Int64, subtitle: String) {
+        guard let task = activeContinuedTask else { return }
+        let value = min(max(completed, task.progress.completedUnitCount), 99)
+        task.progress.completedUnitCount = value
+        task.updateTitle("正在创建 AI 歌单", subtitle: subtitle)
+    }
+
+    private func createLocalAIPlaylist(preferences: AIPlaylistPreferences, likedSongIDs: Set<Int>) async -> LocalAIPlaylist? {
         playlistGenerationStatus = "V4 Pro 正在深度思考…"
         defer { isCreatingPlaylist = false }
         do {
+            try Task.checkCancellation()
+            updateContinuedProgress(5, subtitle: "正在读取我喜欢的音乐")
             playlistGenerationStatus = "正在读取我喜欢的音乐…"
             let likedSongs = try await api.songs(ids: Array(likedSongIDs.prefix(40)))
             guard !likedSongs.isEmpty else {
                 throw RecommendationServiceError.message("已同步喜欢歌曲 ID，但未能读取歌曲详情，请刷新登录状态后重试")
             }
+            updateContinuedProgress(15, subtitle: "DeepSeek 正在深度思考")
             playlistGenerationStatus = "V4 Pro 正在结合喜欢歌曲深度思考…"
             let plan = try await deepSeek.streamPlaylistPlan(
                 preferences: preferences,
@@ -215,19 +333,25 @@ final class RecommendationManager: ObservableObject {
                 guard let self else { return }
                 if let reasoning {
                     await self.updatePlaylistGenerationStatus("AI 正在逐字展示思考过程…")
-                    await self.appendPlaylistCharacters(reasoning, toThinking: true)
+                    await self.enqueuePlaylistStream(reasoning, toThinking: true)
                 }
                 if let content {
                     await self.updatePlaylistGenerationStatus("AI 正在逐字整理歌单方案…")
-                    await self.appendPlaylistCharacters(content, toThinking: false)
+                    await self.enqueuePlaylistStream(content, toThinking: false)
                 }
             }
+            try Task.checkCancellation()
+            flushPlaylistStreamBuffer()
             playlistGenerationStatus = "正在匹配网易云歌曲…"
+            updateContinuedProgress(65, subtitle: "正在匹配网易云歌曲")
             var songs: [Song] = []
             let targetCount = min(max(preferences.trackCount, 1), 30)
             let candidateQueries = uniqueStrings(plan.queries + (plan.candidates ?? [])).prefix(50)
             for (index, query) in candidateQueries.enumerated() where songs.count < targetCount {
+                try Task.checkCancellation()
                 playlistGenerationStatus = "正在匹配网易云歌曲 \(songs.count)/\(targetCount)（候选 \(index + 1)/\(candidateQueries.count)）"
+                let matchingProgress = 65 + Int64((Double(index + 1) / Double(max(candidateQueries.count, 1))) * 30)
+                updateContinuedProgress(matchingProgress, subtitle: "已匹配 \(songs.count)/\(targetCount) 首")
                 if let results = try? await api.searchSongs(query),
                    let song = results.first(where: { result in
                        !songs.contains(where: { $0.id == result.id })
@@ -258,6 +382,10 @@ final class RecommendationManager: ObservableObject {
             lastCreatedPlaylist = playlist
             playlistGenerationStatus = "已创建，仅保存在本机"
             return playlist
+        } catch is CancellationError {
+            playlistGenerationStatus = "生成已取消"
+            playlistGenerationError = "后台任务已被系统或用户取消，请重新创建。"
+            return nil
         } catch {
             playlistGenerationStatus = "创建失败"
             playlistGenerationError = NeteaseAPIError.userMessage(for: error)
@@ -269,11 +397,34 @@ final class RecommendationManager: ObservableObject {
         playlistGenerationStatus = value
     }
 
-    private func appendPlaylistCharacters(_ value: String, toThinking: Bool) async {
-        for character in value {
-            if toThinking { playlistThinking.append(character) } else { playlistOutput.append(character) }
-            await Task.yield()
+    private func enqueuePlaylistStream(_ value: String, toThinking: Bool) {
+        guard !value.isEmpty, !Task.isCancelled else { return }
+        if toThinking {
+            pendingPlaylistThinking.append(value)
+        } else {
+            pendingPlaylistOutput.append(value)
         }
+        guard streamPublishTask == nil else { return }
+        streamPublishTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled, let self else { return }
+            self.flushPlaylistStreamBuffer()
+        }
+    }
+
+    private func flushPlaylistStreamBuffer() {
+        streamPublishTask = nil
+        if !pendingPlaylistThinking.isEmpty {
+            playlistThinking.append(pendingPlaylistThinking)
+            pendingPlaylistThinking = ""
+        }
+        if !pendingPlaylistOutput.isEmpty {
+            playlistOutput.append(pendingPlaylistOutput)
+            pendingPlaylistOutput = ""
+        }
+        let streamProgress = min(60, 18 + Int64((playlistThinking.count + playlistOutput.count) / 250))
+        let subtitle = playlistOutput.isEmpty ? "DeepSeek 正在思考" : "正在整理歌单方案"
+        updateContinuedProgress(streamProgress, subtitle: subtitle)
     }
 
     private func loadLocalAIPlaylists() {
