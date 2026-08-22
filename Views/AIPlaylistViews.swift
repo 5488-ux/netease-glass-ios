@@ -1,37 +1,20 @@
 import SwiftUI
 
-/// AI 歌单的选择流程。问题会根据前一步选择调整，最后一项始终为自定义。
+/// AI 通过 present_choice 工具逐轮驱动的可点击选择器。
 struct AIPlaylistComposerView: View {
+    @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     let onGenerate: (AIPlaylistPreferences) -> Void
 
-    @State private var mood = "温柔治愈"
-    @State private var scene = "夜晚独处"
-    @State private var energy = "缓慢铺陈"
-    @State private var language = "不限语言"
     @State private var trackCountChoice = "12 首"
     @State private var customTrackCount = 12
-    @State private var customDirection = ""
+    @State private var selectedOption: String?
+    @State private var customAnswer = ""
 
-    private var needsCustomDirection: Bool {
-        [mood, scene, energy, language].contains("自定义")
-    }
+    private var manager: RecommendationManager { app.recommendationManager }
 
     private var selectedTrackCount: Int {
         trackCountChoice == "自定义" ? customTrackCount : Int(trackCountChoice.replacingOccurrences(of: " 首", with: "")) ?? 12
-    }
-
-    private var sceneOptions: [String] {
-        switch mood {
-        case "电子律动": return ["通勤路上", "运动时刻", "夜间派对", "自定义"]
-        case "失恋释怀": return ["夜晚独处", "雨天发呆", "散步回家", "自定义"]
-        case "热血向前": return ["工作专注", "出门远行", "运动时刻", "自定义"]
-        default: return ["夜晚独处", "阅读写字", "雨天发呆", "自定义"]
-        }
-    }
-
-    private var energyOptions: [String] {
-        scene == "运动时刻" ? ["稳定推进", "热烈爆发", "轻快跳跃", "自定义"] : ["缓慢铺陈", "轻快明亮", "情绪递进", "自定义"]
     }
 
     var body: some View {
@@ -49,54 +32,8 @@ struct AIPlaylistComposerView: View {
                                 .foregroundStyle(.secondary)
                         }
 
-                        choiceGroup("这一刻想要什么情绪？", options: ["温柔治愈", "失恋释怀", "电子律动", "热血向前", "自定义"], selection: $mood)
-                        choiceGroup("准备在什么场景听？", options: sceneOptions, selection: $scene)
-                        choiceGroup("希望歌单的能量如何？", options: energyOptions, selection: $energy)
-                        choiceGroup("语言怎么选？", options: ["不限语言", "华语优先", "英语优先", "韩语/日语优先", "自定义"], selection: $language)
-                        choiceGroup("想生成多少首歌？", options: ["8 首", "12 首", "16 首", "20 首", "自定义"], selection: $trackCountChoice)
-
-                        if trackCountChoice == "自定义" {
-                            HStack {
-                                Text("自定义歌曲数量").font(.headline)
-                                Spacer()
-                                Stepper("\(customTrackCount) 首", value: $customTrackCount, in: 6...30)
-                                    .labelsHidden()
-                                Text("\(customTrackCount) 首").font(.subheadline.weight(.semibold))
-                            }
-                            .padding(15)
-                            .appGlass(cornerRadius: 18)
-                        }
-
-                        if needsCustomDirection {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("自定义方向")
-                                    .font(.headline)
-                                TextField("例如：适合凌晨开车，女声为主", text: $customDirection, axis: .vertical)
-                                    .lineLimit(2...4)
-                                    .padding(12)
-                                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
-                            .padding(15)
-                            .appGlass(cornerRadius: 18)
-                        }
-
-                        Button {
-                            let preferences = AIPlaylistPreferences(
-                                mood: mood,
-                                scene: scene,
-                                energy: energy,
-                                language: language,
-                                trackCount: selectedTrackCount,
-                                customDirection: needsCustomDirection ? customDirection.trimmingCharacters(in: .whitespacesAndNewlines) : nil
-                            )
-                            dismiss()
-                            onGenerate(preferences)
-                        } label: {
-                            Label("让 AI 深度创建歌单", systemImage: "wand.and.stars")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppPalette.violet)
+                        answerHistory
+                        selectorContent
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
@@ -104,8 +41,130 @@ struct AIPlaylistComposerView: View {
             }
             .navigationTitle("AI 歌单")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("重新开始") { Task { await manager.resetPlaylistChoiceInterview() } }
+                        .disabled(manager.isLoadingPlaylistChoice)
+                }
+                ToolbarItem(placement: .topBarTrailing) { Button("取消") { dismiss() } }
+            }
+            .task { await manager.beginPlaylistChoiceInterview() }
         }
+    }
+
+    @ViewBuilder
+    private var answerHistory: some View {
+        if !manager.playlistChoiceAnswers.isEmpty {
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(manager.playlistChoiceAnswers) { item in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.question).font(.caption).foregroundStyle(.secondary)
+                        Text(item.answer).font(.subheadline.weight(.semibold))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(15)
+            .appGlass(cornerRadius: 18)
+        }
+    }
+
+    @ViewBuilder
+    private var selectorContent: some View {
+        if manager.isLoadingPlaylistChoice {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("AI 正在决定下一道选择题…")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 32)
+        } else if let error = manager.playlistChoiceError {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("选择器加载失败", systemImage: "exclamationmark.triangle.fill")
+                    .font(.headline).foregroundStyle(.red)
+                Text(error).font(.caption).foregroundStyle(.secondary)
+                Button("重试") { Task { await manager.beginPlaylistChoiceInterview() } }
+                    .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .appGlass(cornerRadius: 20)
+        } else if manager.isPlaylistInterviewReady {
+            finalCreationControls
+        } else if let question = manager.playlistChoiceQuestion {
+            VStack(alignment: .leading, spacing: 13) {
+                Label("AI 想问你", systemImage: "questionmark.bubble.fill")
+                    .font(.caption.weight(.bold)).foregroundStyle(AppPalette.violet)
+                Text(question.question).font(.title3.bold())
+                VStack(spacing: 9) {
+                    ForEach(question.options, id: \.self) { option in
+                        Button {
+                            selectedOption = option
+                            if option != "自定义" {
+                                selectedOption = nil
+                                customAnswer = ""
+                                Task { await manager.submitPlaylistChoice(option) }
+                            }
+                        } label: {
+                            HStack {
+                                Text(option).font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(13)
+                            .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                if selectedOption == "自定义" {
+                    TextField("输入你的自定义选择", text: $customAnswer, axis: .vertical)
+                        .lineLimit(1...3)
+                        .padding(12)
+                        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    Button("提交自定义选择") {
+                        let value = customAnswer.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !value.isEmpty else { return }
+                        selectedOption = nil
+                        customAnswer = ""
+                        Task { await manager.submitPlaylistChoice(value) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppPalette.violet)
+                    .disabled(customAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(16)
+            .appGlass(cornerRadius: 22)
+        }
+    }
+
+    private var finalCreationControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("AI 已了解你的方向", systemImage: "checkmark.seal.fill")
+                .font(.headline).foregroundStyle(.green)
+            Text("最后选择歌单歌曲数量")
+                .font(.subheadline).foregroundStyle(.secondary)
+            choiceGroup("想生成多少首歌？", options: ["8 首", "12 首", "16 首", "20 首", "自定义"], selection: $trackCountChoice)
+            if trackCountChoice == "自定义" {
+                Stepper("\(customTrackCount) 首", value: $customTrackCount, in: 6...30)
+                    .padding(12)
+                    .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            Button {
+                let preferences = manager.playlistPreferences(trackCount: selectedTrackCount)
+                dismiss()
+                onGenerate(preferences)
+            } label: {
+                Label("让 V4 Pro 深度创建", systemImage: "wand.and.stars").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppPalette.violet)
+        }
+        .padding(16)
+        .appGlass(cornerRadius: 22)
     }
 
     private func choiceGroup(_ title: String, options: [String], selection: Binding<String>) -> some View {
@@ -114,28 +173,34 @@ struct AIPlaylistComposerView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
                 ForEach(options, id: \.self) { option in
                     Button { selection.wrappedValue = option } label: {
-                        Text(option)
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 11)
+                        Text(option).font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity).padding(.vertical, 11)
                             .foregroundStyle(selection.wrappedValue == option ? Color.white : Color.primary)
                             .background(selection.wrappedValue == option ? AppPalette.violet : Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
+                    }.buttonStyle(.plain)
                 }
             }
         }
-        .padding(15)
-        .appGlass(cornerRadius: 20)
     }
 }
 
 struct AIPlaylistGenerationView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
-    let playlist: LocalAIPlaylist?
 
     private var manager: RecommendationManager { app.recommendationManager }
+
+    private var statusIcon: String {
+        if manager.isCreatingPlaylist { return "brain.head.profile" }
+        if manager.playlistGenerationError != nil { return "exclamationmark.triangle.fill" }
+        return "checkmark.seal.fill"
+    }
+
+    private var statusColor: Color {
+        if manager.isCreatingPlaylist { return AppPalette.violet }
+        if manager.playlistGenerationError != nil { return .red }
+        return .green
+    }
 
     var body: some View {
         NavigationStack {
@@ -144,14 +209,29 @@ struct AIPlaylistGenerationView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
-                            Label(manager.playlistGenerationStatus ?? "正在准备…", systemImage: manager.isCreatingPlaylist ? "brain.head.profile" : "checkmark.seal.fill")
+                            Label(manager.playlistGenerationStatus ?? "正在准备…", systemImage: statusIcon)
                                 .font(.headline)
-                                .foregroundStyle(manager.isCreatingPlaylist ? AppPalette.violet : .green)
+                                .foregroundStyle(statusColor)
 
                             streamCard(title: "AI 深度思考", text: manager.playlistThinking.isEmpty ? "正在分析你的选择…" : manager.playlistThinking, icon: "brain")
                             streamCard(title: "AI 歌单方案", text: manager.playlistOutput.isEmpty ? "正在组织歌单…" : manager.playlistOutput, icon: "text.quote")
 
-                            if let playlist {
+                            if let error = manager.playlistGenerationError {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label("创建失败", systemImage: "exclamationmark.triangle.fill")
+                                        .font(.headline)
+                                        .foregroundStyle(.red)
+                                    Text(error)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(16)
+                                .appGlass(cornerRadius: 20)
+                            }
+
+                            if let playlist = manager.lastCreatedPlaylist {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(playlist.title).font(.title3.bold())
                                     Text(playlist.summary).font(.subheadline).foregroundStyle(.secondary)
@@ -170,7 +250,7 @@ struct AIPlaylistGenerationView: View {
                     .onChange(of: manager.playlistOutput) { _, _ in proxy.scrollTo("stream-end", anchor: .bottom) }
                 }
             }
-            .navigationTitle("AI 正在创作")
+            .navigationTitle(manager.isCreatingPlaylist ? "AI 正在创作" : "AI 歌单")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

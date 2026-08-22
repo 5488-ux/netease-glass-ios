@@ -6,7 +6,6 @@ struct RecommendationView: View {
     @State private var resolvingTrackID: String?
     @State private var showingAIComposer = false
     @State private var showingAIGeneration = false
-    @State private var generatedPlaylist: LocalAIPlaylist?
     @State private var selectedLocalPlaylist: LocalAIPlaylist?
 
     private var manager: RecommendationManager { app.recommendationManager }
@@ -44,13 +43,12 @@ struct RecommendationView: View {
             }
             .sheet(isPresented: $showingAIComposer) {
                 AIPlaylistComposerView { preferences in
-                    generatedPlaylist = nil
                     showingAIGeneration = true
-                    Task { generatedPlaylist = await manager.createLocalAIPlaylist(preferences: preferences) }
+                    Task { _ = await manager.createLocalAIPlaylist(preferences: preferences) }
                 }
             }
             .sheet(isPresented: $showingAIGeneration) {
-                AIPlaylistGenerationView(playlist: generatedPlaylist)
+                AIPlaylistGenerationView()
             }
             .sheet(item: $selectedLocalPlaylist) { playlist in
                 LocalAIPlaylistDetailView(playlist: playlist)

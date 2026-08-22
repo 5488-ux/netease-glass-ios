@@ -35,6 +35,29 @@ struct AIPlaylistPlan: Codable, Equatable {
     let queries: [String]
 }
 
+struct AIPlaylistChoiceAnswer: Codable, Hashable, Identifiable {
+    let id: UUID
+    let question: String
+    let answer: String
+
+    init(question: String, answer: String) {
+        id = UUID()
+        self.question = question
+        self.answer = answer
+    }
+}
+
+struct AIPlaylistChoiceRequest: Equatable, Identifiable {
+    let id = UUID()
+    let question: String
+    let options: [String]
+}
+
+enum AIPlaylistChoiceStep: Equatable {
+    case question(AIPlaylistChoiceRequest)
+    case ready
+}
+
 struct LocalAIPlaylist: Codable, Identifiable, Hashable {
     let id: UUID
     let createdAt: Date

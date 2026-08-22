@@ -14,7 +14,7 @@
 - 歌曲卡片支持红色爱心，添加或取消后与网易云“我喜欢的音乐”双向校验同步
 - 推荐页：网易云每日推荐、新歌速递、Apple Music 中国区公开热歌榜；外部榜单条目会映射到网易云后播放
 - 可选 DeepSeek 偏好分析：密钥仅保存于本机钥匙串，App 打开后自动根据喜欢歌曲和少量歌词摘要生成推荐；设置中可检测 API 是否激活，推荐页可手动换一批歌曲
-- 本地 AI 歌单：按选择题确定场景与风格，用 DeepSeek V4 Pro 深度思考流式创作，逐字显示过程；歌单仅保存于 App 本机，绝不写入网易云
+- 本地 AI 歌单：内置 `present_choice` AI 工具，由 DeepSeek V4 Pro 主动决定问题和可点击选项；完成访谈后深度思考并流式逐字创作，歌单仅保存于 App 本机
 - AI 生成的 iOS 26 风格应用图标
 - 下载失败详细诊断，记录接口、音质尝试、HTTP 状态、系统错误码和失败阶段
 - 下载到 `Documents/Music/`，默认写入 MP3 ID3 元数据和封面
@@ -32,8 +32,8 @@ Actions 工作流位于 `.github/workflows/build.yml`。它使用 macOS Runner�
 
 ## 版本
 
-- Marketing Version: `3.7`
-- Build Number: `30`
+- Marketing Version: `4.0`
+- Build Number: `33`
 
 ## 版本规则
 

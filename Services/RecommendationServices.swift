@@ -61,6 +61,104 @@ final class DeepSeekRecommendationService {
         return profile
     }
 
+    /// 让 V4 Pro 主动调用 App 内置的 present_choice 工具，决定下一道选择题。
+    func nextPlaylistChoice(
+        answers: [AIPlaylistChoiceAnswer],
+        apiKey: String
+    ) async throws -> AIPlaylistChoiceStep {
+        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw RecommendationServiceError.missingAPIKey
+        }
+        if answers.count >= 5 { return .ready }
+        let history = answers.isEmpty
+            ? "尚未提问"
+            : answers.map { "问题：\($0.question)\n选择：\($0.answer)" }.joined(separator: "\n---\n")
+        let prompt = """
+        你正在通过选择器了解用户想创建的音乐歌单。
+        已有回答：
+        \(history)
+
+        规则：
+        1. 至少询问 2 题，最多询问 5 题；问题数量由你根据已有信息决定。
+        2. 信息不足时必须调用 present_choice，一次只问一个最有价值的问题。
+        3. 给出 2 到 5 个简短、互斥的选项，最后一个选项必须严格写为“自定义”。
+        4. 不要重复已经问过的问题。
+        5. 信息足够且已经至少回答 2 题时，不调用工具，只回复 READY。
+        """
+        let tools: [[String: Any]] = [[
+            "type": "function",
+            "function": [
+                "name": "present_choice",
+                "description": "在 App 中向用户显示一个可点击的单选选择器",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "question": ["type": "string", "description": "要向用户提出的简短中文问题"],
+                        "options": [
+                            "type": "array",
+                            "items": ["type": "string"],
+                            "minItems": 2,
+                            "maxItems": 5,
+                            "description": "可点击选项，最后一项必须为自定义"
+                        ]
+                    ],
+                    "required": ["question", "options"]
+                ]
+            ]
+        ]]
+        var body: [String: Any] = [
+            "model": "deepseek-v4-pro",
+            "messages": [
+                ["role": "system", "content": "你是音乐策展访谈助手。需要用户选择时调用工具，不要输出伪选项文本。"],
+                ["role": "user", "content": prompt]
+            ],
+            "tools": tools,
+            "thinking": ["type": "enabled"],
+            "reasoning_effort": "high",
+            "max_tokens": 700
+        ]
+        if answers.count < 2 {
+            body["tool_choice"] = ["type": "function", "function": ["name": "present_choice"]]
+        } else {
+            body["tool_choice"] = "auto"
+        }
+        var request = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw RecommendationServiceError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let server = String(data: data, encoding: .utf8) ?? ""
+            throw RecommendationServiceError.message("AI 选择器请求失败（HTTP \(http.statusCode)）\(server.isEmpty ? "" : "：\(server.prefix(220))")")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let message = choices.first?["message"] as? [String: Any] else {
+            throw RecommendationServiceError.invalidResponse
+        }
+        if let toolCalls = message["tool_calls"] as? [[String: Any]],
+           let function = toolCalls.first?["function"] as? [String: Any],
+           function["name"] as? String == "present_choice",
+           let arguments = function["arguments"] as? String,
+           let argumentsData = arguments.data(using: .utf8),
+           let payload = try? JSONSerialization.jsonObject(with: argumentsData) as? [String: Any],
+           let question = payload["question"] as? String,
+           var options = payload["options"] as? [String],
+           !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            options = options
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && $0 != "自定义" }
+            options = Array(options.prefix(4)) + ["自定义"]
+            return .question(AIPlaylistChoiceRequest(question: question, options: options))
+        }
+        let content = (message["content"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if answers.count >= 2, content.uppercased().contains("READY") { return .ready }
+        throw RecommendationServiceError.message("AI 没有正确调用选择器，请点击重试")
+    }
+
     /// 使用 V4 Pro 深度思考并通过 SSE 逐步回传思考和最终歌单 JSON。
     func streamPlaylistPlan(
         preferences: AIPlaylistPreferences,

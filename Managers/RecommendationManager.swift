@@ -22,7 +22,14 @@ final class RecommendationManager: ObservableObject {
     @Published private(set) var playlistThinking = ""
     @Published private(set) var playlistOutput = ""
     @Published private(set) var playlistGenerationStatus: String?
+    @Published private(set) var playlistGenerationError: String?
+    @Published private(set) var lastCreatedPlaylist: LocalAIPlaylist?
     @Published private(set) var isCreatingPlaylist = false
+    @Published private(set) var playlistChoiceQuestion: AIPlaylistChoiceRequest?
+    @Published private(set) var playlistChoiceAnswers: [AIPlaylistChoiceAnswer] = []
+    @Published private(set) var isLoadingPlaylistChoice = false
+    @Published private(set) var isPlaylistInterviewReady = false
+    @Published private(set) var playlistChoiceError: String?
 
     private let api: NeteaseAPI
     private let deepSeek = DeepSeekRecommendationService()
@@ -115,6 +122,63 @@ final class RecommendationManager: ObservableObject {
         lastErrorMessage = nil
     }
 
+    func beginPlaylistChoiceInterview() async {
+        guard playlistChoiceQuestion == nil, !isPlaylistInterviewReady else { return }
+        await requestNextPlaylistChoice()
+    }
+
+    func resetPlaylistChoiceInterview() async {
+        playlistChoiceQuestion = nil
+        playlistChoiceAnswers = []
+        playlistChoiceError = nil
+        isPlaylistInterviewReady = false
+        await requestNextPlaylistChoice()
+    }
+
+    func submitPlaylistChoice(_ answer: String) async {
+        guard let question = playlistChoiceQuestion, !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        playlistChoiceAnswers.append(AIPlaylistChoiceAnswer(question: question.question, answer: answer))
+        playlistChoiceQuestion = nil
+        await requestNextPlaylistChoice()
+    }
+
+    func playlistPreferences(trackCount: Int) -> AIPlaylistPreferences {
+        let values = playlistChoiceAnswers.map(\.answer)
+        return AIPlaylistPreferences(
+            mood: values.first ?? "由 AI 选择器决定",
+            scene: values.dropFirst().first ?? "由 AI 选择器决定",
+            energy: values.dropFirst(2).first ?? "由 AI 选择器决定",
+            language: values.dropFirst(3).first ?? "不限语言",
+            trackCount: trackCount,
+            customDirection: playlistChoiceAnswers.map { "\($0.question)：\($0.answer)" }.joined(separator: "；")
+        )
+    }
+
+    private func requestNextPlaylistChoice() async {
+        guard hasDeepSeekAPIKey else {
+            playlistChoiceError = "请先在设置中保存 DeepSeek API Key"
+            return
+        }
+        guard !isLoadingPlaylistChoice else { return }
+        isLoadingPlaylistChoice = true
+        playlistChoiceError = nil
+        defer { isLoadingPlaylistChoice = false }
+        do {
+            let step = try await deepSeek.nextPlaylistChoice(
+                answers: playlistChoiceAnswers,
+                apiKey: KeychainStore.loadDeepSeekAPIKey() ?? ""
+            )
+            switch step {
+            case let .question(question):
+                playlistChoiceQuestion = question
+            case .ready:
+                isPlaylistInterviewReady = true
+            }
+        } catch {
+            playlistChoiceError = NeteaseAPIError.userMessage(for: error)
+        }
+    }
+
     func createLocalAIPlaylist(preferences: AIPlaylistPreferences) async -> LocalAIPlaylist? {
         guard hasDeepSeekAPIKey else {
             lastErrorMessage = "请先在设置中保存并检测 DeepSeek API Key"
@@ -128,6 +192,8 @@ final class RecommendationManager: ObservableObject {
         isCreatingPlaylist = true
         playlistThinking = ""
         playlistOutput = ""
+        playlistGenerationError = nil
+        lastCreatedPlaylist = nil
         playlistGenerationStatus = "V4 Pro 正在深度思考…"
         defer { isCreatingPlaylist = false }
         do {
@@ -137,9 +203,11 @@ final class RecommendationManager: ObservableObject {
             ) { [weak self] reasoning, content in
                 guard let self else { return }
                 if let reasoning {
+                    await self.updatePlaylistGenerationStatus("AI 正在逐字展示思考过程…")
                     await self.appendPlaylistCharacters(reasoning, toThinking: true)
                 }
                 if let content {
+                    await self.updatePlaylistGenerationStatus("AI 正在逐字整理歌单方案…")
                     await self.appendPlaylistCharacters(content, toThinking: false)
                 }
             }
@@ -165,19 +233,24 @@ final class RecommendationManager: ObservableObject {
             )
             localAIPlaylists.insert(playlist, at: 0)
             persistLocalAIPlaylists()
+            lastCreatedPlaylist = playlist
             playlistGenerationStatus = "已创建，仅保存在本机"
             return playlist
         } catch {
             playlistGenerationStatus = "创建失败"
-            lastErrorMessage = NeteaseAPIError.userMessage(for: error)
+            playlistGenerationError = NeteaseAPIError.userMessage(for: error)
             return nil
         }
+    }
+
+    private func updatePlaylistGenerationStatus(_ value: String) {
+        playlistGenerationStatus = value
     }
 
     private func appendPlaylistCharacters(_ value: String, toThinking: Bool) async {
         for character in value {
             if toThinking { playlistThinking.append(character) } else { playlistOutput.append(character) }
-            try? await Task.sleep(for: .milliseconds(5))
+            await Task.yield()
         }
     }
 
