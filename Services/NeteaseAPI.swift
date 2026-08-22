@@ -222,6 +222,34 @@ final class NeteaseAPI {
         return try await fetchSongs(ids: ids)
     }
 
+    /// 读取网易云歌曲的公开热门评论与最新评论；查看评论不要求登录。
+    func songComments(songID: Int, offset: Int = 0, limit: Int = 20) async throws -> SongCommentPage {
+        var components = URLComponents(
+            url: musicURL.appendingPathComponent("api/v1/resource/comments/R_SO_4_\(songID)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "limit", value: String(min(max(limit, 1), 50))),
+            URLQueryItem(name: "offset", value: String(max(offset, 0)))
+        ]
+        guard let url = components.url else { throw NeteaseAPIError.invalidURL }
+        let json = try await requestJSON(
+            url: url,
+            method: "GET",
+            body: nil,
+            contentType: nil,
+            context: "获取歌曲评论"
+        )
+        let hot = (json["hotComments"] as? [[String: Any]] ?? []).compactMap(parseSongComment)
+        let comments = (json["comments"] as? [[String: Any]] ?? []).compactMap(parseSongComment)
+        return SongCommentPage(
+            hotComments: offset == 0 ? hot : [],
+            comments: comments,
+            total: int(json["total"]) ?? comments.count,
+            hasMore: json["more"] as? Bool ?? false
+        )
+    }
+
     func createQRLogin() async throws -> QRLoginSession {
         var components = URLComponents(url: URL(string: "https://interface.music.163.com/api/login/qrcode/unikey")!, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "type", value: "3"), URLQueryItem(name: "timestamp", value: String(Int(Date().timeIntervalSince1970 * 1000)))]
@@ -468,6 +496,26 @@ final class NeteaseAPI {
         guard let id = int(raw["id"]), let name = raw["name"] as? String else { return nil }
         let creator = raw["creator"] as? [String: Any]
         return Playlist(id: id, name: name, creatorName: creator?["nickname"] as? String ?? "未知创建者", description: raw["description"] as? String ?? "", trackCount: int(raw["trackCount"]) ?? 0, coverURL: secureURL(raw["coverImgUrl"] as? String ?? raw["picUrl"] as? String ?? ""))
+    }
+
+    private func parseSongComment(_ raw: [String: Any]) -> SongComment? {
+        guard let id = int(raw["commentId"]),
+              let content = raw["content"] as? String,
+              let user = raw["user"] as? [String: Any] else { return nil }
+        let replied = (raw["beReplied"] as? [[String: Any]])?.first
+        let repliedUser = replied?["user"] as? [String: Any]
+        let location = (raw["ipLocation"] as? [String: Any])?["location"] as? String
+        return SongComment(
+            id: id,
+            nickname: user["nickname"] as? String ?? "网易云用户",
+            avatarURL: secureURL(user["avatarUrl"] as? String ?? ""),
+            content: content,
+            timeText: raw["timeStr"] as? String ?? "",
+            location: location,
+            likedCount: int(raw["likedCount"]) ?? 0,
+            repliedNickname: repliedUser?["nickname"] as? String,
+            repliedContent: replied?["content"] as? String
+        )
     }
 
     private func parseUser(_ raw: [String: Any]) -> NeteaseUser? {

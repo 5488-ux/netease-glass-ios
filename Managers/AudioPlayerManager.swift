@@ -257,10 +257,11 @@ final class AudioPlayerManager: NSObject, ObservableObject {
 #if DEBUG
     /// 仅供 CI 模拟器做播放器真实截图检查，不会进入 Release 构建行为。
     func prepareLayoutPreview() {
+        let isCommentCheck = ProcessInfo.processInfo.arguments.contains("--ui-check-comments")
         let previewSong = Song(
-            id: -1,
-            name: "播放器布局检查",
-            artist: "NeteaseGlass",
+            id: isCommentCheck ? 347230 : -1,
+            name: isCommentCheck ? "海阔天空" : "播放器布局检查",
+            artist: isCommentCheck ? "BEYOND" : "NeteaseGlass",
             album: "UI Check",
             duration: 180,
             coverURL: nil,

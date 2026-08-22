@@ -157,18 +157,33 @@ final class DeepSeekRecommendationService {
     /// 使用 V4 Pro 深度思考并通过 SSE 逐步回传思考和最终歌单 JSON。
     func streamPlaylistPlan(
         preferences: AIPlaylistPreferences,
+        likedSongs: [Song],
         apiKey: String,
         onDelta: @escaping @Sendable (_ reasoning: String?, _ content: String?) async -> Void
     ) async throws -> AIPlaylistPlan {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RecommendationServiceError.missingAPIKey
         }
+        let requestedCount = min(max(preferences.trackCount, 1), 30)
+        let candidateCount = min(50, requestedCount + 20)
+        let likedSongsText = likedSongs.prefix(40).enumerated().map { index, song in
+            "\(index + 1). \(song.name) - \(song.artist)"
+        }.joined(separator: "\n")
         let prompt = """
-        你正在为用户制作一个仅保存在本地的音乐歌单。请认真深度思考用户选择，避免泛泛而谈，选择可在网易云搜索到的真实歌曲。
+        你正在为用户制作一个仅保存在本地的音乐歌单。请认真深度思考用户选择，并且必须把用户真实喜欢的歌曲作为主要审美依据，避免只按情绪标签泛泛推荐。选择可在网易云搜索到的真实歌曲，不要编造歌曲或歌手。
         用户选择：\(preferences.promptDescription)
+        用户真实喜欢的歌曲（用于分析审美、歌手、年代、语言、编曲和歌词倾向）：
+        \(likedSongsText.isEmpty ? "未读取到" : likedSongsText)
+
+        策展流程：
+        1. 先结合喜欢歌曲和用户选择建立候选池，候选池必须恰好 \(candidateCount) 首，绝对不能超过 50 首。
+        2. 再从候选池中筛选恰好 \(requestedCount) 首作为最终歌单。
+        3. 最终歌曲必须包含与喜欢歌曲相近的风格，同时保留适量新鲜探索，避免清一色同一歌手。
+        4. 深度思考中不要编号列举超过 50 首，完整候选只放进最终 JSON 的 candidates。
+
         最终只能输出 JSON，不要 Markdown：
-        {"title":"不超过16字的歌单名","summary":"不超过48字的歌单简介","thoughts":["至少3条具体创作想法"],"queries":["歌曲名 歌手", "..."]}
-        queries 必须给出恰好 \(preferences.trackCount) 条真实歌曲名加歌手，覆盖不同节奏但保持同一主题。
+        {"title":"不超过16字的歌单名","summary":"不超过48字的歌单简介","thoughts":["至少3条具体创作想法"],"candidates":["歌曲名 - 歌手", "..."],"queries":["歌曲名 - 歌手", "..."]}
+        candidates 必须恰好 \(candidateCount) 条且不重复；queries 必须恰好 \(requestedCount) 条、只能从 candidates 中选择且不重复。
         """
         let body: [String: Any] = [
             "model": "deepseek-v4-pro",
@@ -177,15 +192,14 @@ final class DeepSeekRecommendationService {
                 ["role": "user", "content": prompt]
             ],
             "thinking": ["type": "enabled"],
-            "reasoning_effort": "high",
+            "reasoning_effort": "max",
             "stream": true,
-            "temperature": 0.75,
-            "max_tokens": 1_400,
+            "max_tokens": 12_000,
             "response_format": ["type": "json_object"]
         ]
         var request = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
         request.httpMethod = "POST"
-        request.timeoutInterval = 120
+        request.timeoutInterval = 240
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -203,6 +217,8 @@ final class DeepSeekRecommendationService {
         }
 
         var finalContent = ""
+        var finishReason: String?
+        var reasoningLimiter = NumberedListLimiter(maximumNumber: 50)
         for try await line in bytes.lines {
             guard line.hasPrefix("data:") else { continue }
             let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
@@ -210,19 +226,66 @@ final class DeepSeekRecommendationService {
             guard let data = payload.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let choices = json["choices"] as? [[String: Any]],
-                  let delta = choices.first?["delta"] as? [String: Any] else { continue }
+                  let choice = choices.first else { continue }
+            if let value = choice["finish_reason"] as? String { finishReason = value }
+            guard let delta = choice["delta"] as? [String: Any] else { continue }
             let reasoning = delta["reasoning_content"] as? String
             let content = delta["content"] as? String
             if let content { finalContent += content }
-            if reasoning != nil || content != nil { await onDelta(reasoning, content) }
+            let visibleReasoning = reasoning.map { reasoningLimiter.consume($0) }
+            if visibleReasoning?.isEmpty == false || content != nil {
+                await onDelta(visibleReasoning, content)
+            }
         }
-        guard let planData = finalContent.data(using: .utf8),
+        let reasoningTail = reasoningLimiter.flush()
+        if !reasoningTail.isEmpty { await onDelta(reasoningTail, nil) }
+        if finishReason == "length" {
+            throw RecommendationServiceError.message("DeepSeek 输出达到长度限制，最终歌单 JSON 被截断，请重试")
+        }
+        guard let planData = jsonData(from: finalContent),
               let plan = try? JSONDecoder().decode(AIPlaylistPlan.self, from: planData),
               !plan.title.isEmpty,
               !plan.queries.isEmpty else {
-            throw RecommendationServiceError.invalidResponse
+            throw RecommendationServiceError.message(finalContent.isEmpty
+                ? "DeepSeek 深度思考完成，但没有返回最终歌单 JSON，请重试"
+                : "DeepSeek 返回的最终歌单格式不完整，请重试")
         }
-        return plan
+        let candidates = uniqueQueries((plan.candidates ?? []) + plan.queries, limit: 50)
+        var selected = uniqueQueries(plan.queries, limit: requestedCount)
+        for query in candidates where selected.count < requestedCount && !selected.contains(query) {
+            selected.append(query)
+        }
+        guard selected.count == requestedCount else {
+            throw RecommendationServiceError.message("AI 只给出 \(selected.count) 首有效歌曲，少于要求的 \(requestedCount) 首，请重试")
+        }
+        return AIPlaylistPlan(
+            title: plan.title,
+            summary: plan.summary,
+            thoughts: plan.thoughts,
+            candidates: candidates,
+            queries: selected
+        )
+    }
+
+    private func jsonData(from content: String) -> Data? {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let start = trimmed.firstIndex(of: "{"),
+              let end = trimmed.lastIndex(of: "}"),
+              start <= end else { return nil }
+        return String(trimmed[start...end]).data(using: .utf8)
+    }
+
+    private func uniqueQueries(_ values: [String], limit: Int) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for value in values {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = trimmed.lowercased()
+            guard !trimmed.isEmpty, seen.insert(key).inserted else { continue }
+            result.append(trimmed)
+            if result.count == limit { break }
+        }
+        return result
     }
 
     private func requestCompletion(messages: [[String: String]], apiKey: String, temperature: Double, maxTokens: Int) async throws -> String {
@@ -256,6 +319,42 @@ final class DeepSeekRecommendationService {
             throw RecommendationServiceError.invalidResponse
         }
         return content
+    }
+}
+
+/// DeepSeek 的思考文本仍会逐字显示，但模型若失控列出第 51 首及以后的编号候选，App 会直接丢弃这些行。
+private struct NumberedListLimiter {
+    let maximumNumber: Int
+    private var pending = ""
+
+    init(maximumNumber: Int) {
+        self.maximumNumber = maximumNumber
+    }
+
+    mutating func consume(_ value: String) -> String {
+        pending += value
+        var output = ""
+        while let newline = pending.firstIndex(of: "\n") {
+            let line = String(pending[..<newline])
+            pending.removeSubrange(...newline)
+            if shouldKeep(line) { output += line + "\n" }
+        }
+        return output
+    }
+
+    mutating func flush() -> String {
+        defer { pending = "" }
+        return shouldKeep(pending) ? pending : ""
+    }
+
+    private func shouldKeep(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let digits = trimmed.prefix { $0.isNumber }
+        guard !digits.isEmpty,
+              let number = Int(digits),
+              number > maximumNumber else { return true }
+        let suffix = trimmed.dropFirst(digits.count)
+        return !(suffix.hasPrefix(".") || suffix.hasPrefix("、") || suffix.hasPrefix(")") || suffix.hasPrefix("）"))
     }
 }
 

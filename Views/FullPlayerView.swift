@@ -10,6 +10,7 @@ struct FullPlayerView: View {
     @State private var artworkImage: UIImage?
     @State private var draggingProgress: Double?
     @State private var showsLyrics = false
+    @State private var showsComments = false
     @State private var verticalDrag: CGFloat = 0
 
     private var player: AudioPlayerManager { app.audioPlayer }
@@ -17,6 +18,7 @@ struct FullPlayerView: View {
     init() {
 #if DEBUG
         _showsLyrics = State(initialValue: ProcessInfo.processInfo.arguments.contains("--ui-check-lyrics"))
+        _showsComments = State(initialValue: ProcessInfo.processInfo.arguments.contains("--ui-check-comments"))
 #endif
     }
 
@@ -61,6 +63,11 @@ struct FullPlayerView: View {
         .task(id: player.currentSong?.id) {
             await loadArtwork()
             await loadLyrics()
+        }
+        .sheet(isPresented: $showsComments) {
+            if let song = player.currentSong {
+                SongCommentsView(song: song)
+            }
         }
     }
 
@@ -392,7 +399,7 @@ struct FullPlayerView: View {
     }
 
     private var bottomTools: some View {
-        HStack(spacing: 62) {
+        HStack(spacing: 34) {
             Button {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     showsLyrics.toggle()
@@ -406,6 +413,19 @@ struct FullPlayerView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(showsLyrics ? "返回封面" : "显示歌词")
+
+            Button {
+                showsComments = true
+            } label: {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 22, weight: .semibold))
+                    .frame(width: 56, height: 48)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(player.currentSong == nil)
+            .opacity(player.currentSong == nil ? 0.3 : 1)
+            .accessibilityLabel("查看网易云评论")
 
             AirPlayRouteButton()
                 .frame(width: 56, height: 48)

@@ -179,13 +179,17 @@ final class RecommendationManager: ObservableObject {
         }
     }
 
-    func createLocalAIPlaylist(preferences: AIPlaylistPreferences) async -> LocalAIPlaylist? {
+    func createLocalAIPlaylist(preferences: AIPlaylistPreferences, likedSongIDs: Set<Int>) async -> LocalAIPlaylist? {
         guard hasDeepSeekAPIKey else {
             lastErrorMessage = "请先在设置中保存并检测 DeepSeek API Key"
             return nil
         }
         guard api.hasCookie else {
             lastErrorMessage = "请先登录网易云音乐，AI 才能把歌单中的歌曲匹配为可播放条目"
+            return nil
+        }
+        guard !likedSongIDs.isEmpty else {
+            lastErrorMessage = "没有读取到你喜欢的歌曲，请先在网易云收藏歌曲并刷新喜欢列表"
             return nil
         }
         guard !isCreatingPlaylist else { return nil }
@@ -197,8 +201,15 @@ final class RecommendationManager: ObservableObject {
         playlistGenerationStatus = "V4 Pro 正在深度思考…"
         defer { isCreatingPlaylist = false }
         do {
+            playlistGenerationStatus = "正在读取我喜欢的音乐…"
+            let likedSongs = try await api.songs(ids: Array(likedSongIDs.prefix(40)))
+            guard !likedSongs.isEmpty else {
+                throw RecommendationServiceError.message("已同步喜欢歌曲 ID，但未能读取歌曲详情，请刷新登录状态后重试")
+            }
+            playlistGenerationStatus = "V4 Pro 正在结合喜欢歌曲深度思考…"
             let plan = try await deepSeek.streamPlaylistPlan(
                 preferences: preferences,
+                likedSongs: likedSongs,
                 apiKey: KeychainStore.loadDeepSeekAPIKey() ?? ""
             ) { [weak self] reasoning, content in
                 guard let self else { return }
@@ -213,14 +224,25 @@ final class RecommendationManager: ObservableObject {
             }
             playlistGenerationStatus = "正在匹配网易云歌曲…"
             var songs: [Song] = []
-            for query in plan.queries.prefix(preferences.trackCount) {
-                if let song = try? await api.searchSongs(query).first,
-                   !songs.contains(where: { $0.id == song.id }) {
+            let targetCount = min(max(preferences.trackCount, 1), 30)
+            let candidateQueries = uniqueStrings(plan.queries + (plan.candidates ?? [])).prefix(50)
+            for (index, query) in candidateQueries.enumerated() where songs.count < targetCount {
+                playlistGenerationStatus = "正在匹配网易云歌曲 \(songs.count)/\(targetCount)（候选 \(index + 1)/\(candidateQueries.count)）"
+                if let results = try? await api.searchSongs(query),
+                   let song = results.first(where: { result in
+                       !songs.contains(where: { $0.id == result.id })
+                   }) {
                     songs.append(song)
                 }
             }
-            guard !songs.isEmpty else {
-                throw RecommendationServiceError.message("AI 已给出歌单方案，但未能在网易云匹配到可播放歌曲")
+            for song in likedSongs where songs.count < targetCount && !songs.contains(where: { $0.id == song.id }) {
+                songs.append(song)
+            }
+            for song in personalizedSongs + trendingSongs where songs.count < targetCount && !songs.contains(where: { $0.id == song.id }) {
+                songs.append(song)
+            }
+            guard songs.count == targetCount else {
+                throw RecommendationServiceError.message("要求创建 \(targetCount) 首，但 50 首 AI 候选和喜欢歌曲中只匹配到 \(songs.count) 首可用歌曲")
             }
             let playlist = LocalAIPlaylist(
                 id: UUID(),
@@ -263,6 +285,14 @@ final class RecommendationManager: ObservableObject {
     private func persistLocalAIPlaylists() {
         guard let data = try? JSONEncoder().encode(localAIPlaylists) else { return }
         UserDefaults.standard.set(data, forKey: localPlaylistStorageKey)
+    }
+
+    private func uniqueStrings(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.filter { value in
+            let key = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return !key.isEmpty && seen.insert(key).inserted
+        }
     }
 
     func analyzeLikes(likedSongIDs: Set<Int>, force: Bool = false) async {

@@ -32,6 +32,7 @@ struct AIPlaylistPlan: Codable, Equatable {
     let title: String
     let summary: String
     let thoughts: [String]
+    let candidates: [String]?
     let queries: [String]
 }
 

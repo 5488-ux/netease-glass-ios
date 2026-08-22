@@ -44,7 +44,12 @@ struct RecommendationView: View {
             .sheet(isPresented: $showingAIComposer) {
                 AIPlaylistComposerView { preferences in
                     showingAIGeneration = true
-                    Task { _ = await manager.createLocalAIPlaylist(preferences: preferences) }
+                    Task {
+                        _ = await manager.createLocalAIPlaylist(
+                            preferences: preferences,
+                            likedSongIDs: app.likeManager.likedSongIDs
+                        )
+                    }
                 }
             }
             .sheet(isPresented: $showingAIGeneration) {
