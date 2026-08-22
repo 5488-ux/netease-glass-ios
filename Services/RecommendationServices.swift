@@ -106,7 +106,7 @@ final class DeepSeekRecommendationService {
                 ]
             ]
         ]]
-        var body: [String: Any] = [
+        let body: [String: Any] = [
             "model": "deepseek-v4-pro",
             "messages": [
                 ["role": "system", "content": "你是音乐策展访谈助手。需要用户选择时调用工具，不要输出伪选项文本。"],
@@ -117,11 +117,6 @@ final class DeepSeekRecommendationService {
             "reasoning_effort": "high",
             "max_tokens": 700
         ]
-        if answers.count < 2 {
-            body["tool_choice"] = ["type": "function", "function": ["name": "present_choice"]]
-        } else {
-            body["tool_choice"] = "auto"
-        }
         var request = URLRequest(url: URL(string: "https://api.deepseek.com/chat/completions")!)
         request.httpMethod = "POST"
         request.timeoutInterval = 60

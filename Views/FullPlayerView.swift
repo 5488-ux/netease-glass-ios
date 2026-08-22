@@ -137,17 +137,18 @@ struct FullPlayerView: View {
                 qualityMenu
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 48)
+        .frame(maxWidth: .infinity, minHeight: 58)
     }
 
     private func glassIconButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .bold))
-                .frame(width: 20, height: 20)
+                .font(.system(size: 20, weight: .bold))
+                .frame(width: 46, height: 46)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.glass)
-        .controlSize(.small)
+        .controlSize(.regular)
         .accessibilityLabel(label)
     }
 
@@ -166,11 +167,12 @@ struct FullPlayerView: View {
             }
         } label: {
             Image(systemName: "waveform.badge.magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 20, height: 20)
+                .font(.system(size: 20, weight: .semibold))
+                .frame(width: 46, height: 46)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.glass)
-        .controlSize(.small)
+        .controlSize(.regular)
         .accessibilityLabel("选择音质")
     }
 
@@ -390,25 +392,26 @@ struct FullPlayerView: View {
     }
 
     private var bottomTools: some View {
-        HStack(spacing: 54) {
+        HStack(spacing: 62) {
             Button {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     showsLyrics.toggle()
                 }
             } label: {
                 Image(systemName: showsLyrics ? "rectangle.portrait" : "quote.bubble")
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 42, height: 38)
+                    .font(.system(size: 23, weight: .semibold))
+                    .frame(width: 56, height: 48)
                     .background(showsLyrics ? AppPalette.blue.opacity(0.14) : .clear, in: Capsule())
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(showsLyrics ? "返回封面" : "显示歌词")
 
             AirPlayRouteButton()
-                .frame(width: 42, height: 38)
+                .frame(width: 56, height: 48)
                 .accessibilityLabel("隔空播放")
         }
-        .frame(maxWidth: .infinity, minHeight: 42)
+        .frame(maxWidth: .infinity, minHeight: 52)
         .foregroundStyle(.secondary)
     }
 
@@ -503,11 +506,21 @@ private struct AirPlayRouteButton: UIViewRepresentable {
         view.prioritizesVideoDevices = false
         view.tintColor = UIColor.label.withAlphaComponent(0.72)
         view.activeTintColor = UIColor.label
+        Self.enlargeRouteGlyph(in: view)
         return view
     }
 
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
         uiView.tintColor = UIColor.label.withAlphaComponent(0.72)
         uiView.activeTintColor = UIColor.label
+        Self.enlargeRouteGlyph(in: uiView)
+    }
+
+    private static func enlargeRouteGlyph(in view: AVRoutePickerView) {
+        let configuration = UIImage.SymbolConfiguration(pointSize: 23, weight: .semibold)
+        for case let button as UIButton in view.subviews {
+            button.setPreferredSymbolConfiguration(configuration, forImageIn: .normal)
+            button.imageView?.contentMode = .scaleAspectFit
+        }
     }
 }
